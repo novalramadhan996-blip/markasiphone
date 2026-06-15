@@ -78,11 +78,11 @@ export default function Navbar() {
             </Link>
 
             <Link
-              href="/admin/login"
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-white/25 to-white/5 shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-white/20"
-            >
-              <UserRound size={18} />
-            </Link>
+  href="/rahasia-admin-markas/login"
+  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-white/25 to-white/5 shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-white/20"
+>
+  <UserRound size={18} />
+</Link>
           </div>
         </nav>
       </header>

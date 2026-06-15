@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -97,7 +98,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           <Link
             href="/rahasia-admin-markas/produk"
             className="group rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:-translate-y-2 hover:bg-white/15"
@@ -118,7 +119,26 @@ export default function DashboardPage() {
               Tambah, edit, dan hapus produk. Data produk terhubung ke database MySQL.
             </p>
           </Link>
+<Link
+  href="/rahasia-admin-markas/laporan"
+  className="group rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:-translate-y-2 hover:bg-white/15"
+>
+  <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-500/20 text-emerald-300">
+    <FileText size={34} />
+  </div>
 
+  <div className="mb-5 flex items-center justify-between">
+    <h2 className="text-4xl font-black tracking-[-0.05em]">
+      Laporan
+    </h2>
+
+    <ArrowUpRight className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
+  </div>
+
+  <p className="text-lg leading-8 text-white/50">
+    Rekap omset, transaksi, dan export laporan.
+  </p>
+</Link>
           <div className="rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl opacity-70">
             <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-500/20 text-purple-300">
               <ImageIcon size={34} />
@@ -153,6 +173,18 @@ export default function DashboardPage() {
               Lihat pesanan masuk dan cetak nota transaksi customer.
             </p>
           </Link>
+          <Link
+  href="/rahasia-admin-markas/keuangan"
+  className="group rounded-[40px] border border-white/10 bg-white/10 p-8"
+>
+  <h2 className="text-4xl font-black">
+    Keuangan
+  </h2>
+
+  <p className="mt-3 text-white/50">
+    Kelola modal, profit, dan arus kas.
+  </p>
+</Link>
         </div>
       </section>
     </main>
