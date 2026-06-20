@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import Navbar from "../components/Navbar";
 import ProductCard from "../components/ProductCard";
+import ChatWidget from "../components/ChatWidget";
 
 type DbProduct = {
   id: number;
@@ -31,8 +32,25 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/products")
       .then((res) => res.json())
-      .then((data) => setProducts(data))
-      .catch((error) => console.error("Gagal ambil produk:", error));
+      .then((data) => {
+        // Handle error response
+        if (data.error || data.message) {
+          console.error("API Error:", data.message);
+          setProducts([]);
+          return;
+        }
+        // Set products jika array
+        if (Array.isArray(data)) {
+          setProducts(data);
+        } else {
+          console.error("Invalid data format:", data);
+          setProducts([]);
+        }
+      })
+      .catch((error) => {
+        console.error("Gagal ambil produk:", error);
+        setProducts([]);
+      });
   }, []);
 
   return (
@@ -216,6 +234,7 @@ export default function Home() {
       <footer className="border-t border-white/10 bg-black px-6 py-10 text-center text-sm text-white/40">
         © 2026 Markas iPhone. Premium cinematic store.
       </footer>
+      <ChatWidget />
     </main>
   );
 }

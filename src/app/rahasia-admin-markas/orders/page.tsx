@@ -1,403 +1,598 @@
 "use client";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { ArrowLeft, Download, Receipt, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Download,
+  Loader2,
+  Package,
+  RefreshCw,
+  Search,
+  ShoppingBag,
+  Trash2,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type OrderStatus = "pending" | "diproses" | "dikirim" | "selesai" | "dibatalkan";
+
 type Order = {
   id: number;
   customer_name: string;
+  customer_email?: string;
   phone: string;
   address: string;
   product: string;
   total_price: string;
-  status: string;
+  status: OrderStatus;
   created_at: string;
 };
+
+type Stats = {
+  total_orders: number;
+  pending_orders: number;
+  completed_orders: number;
+  total_revenue: number;
+};
+
+type Toast = { id: number; message: string; type: "success" | "error" };
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<
+  OrderStatus,
+  { label: string; color: string; bg: string; next: OrderStatus | null }
+> = {
+  pending:     { label: "Pending",     color: "text-yellow-300", bg: "bg-yellow-500/20 border-yellow-500/30", next: "diproses" },
+  diproses:    { label: "Diproses",    color: "text-blue-300",   bg: "bg-blue-500/20 border-blue-500/30",     next: "dikirim" },
+  dikirim:     { label: "Dikirim",     color: "text-purple-300", bg: "bg-purple-500/20 border-purple-500/30", next: "selesai" },
+  selesai:     { label: "Selesai",     color: "text-green-300",  bg: "bg-green-500/20 border-green-500/30",   next: null },
+  dibatalkan:  { label: "Dibatalkan",  color: "text-red-300",    bg: "bg-red-500/20 border-red-500/30",       next: null },
+};
+
+const FILTER_TABS = [
+  { key: "all",        label: "Semua" },
+  { key: "pending",    label: "Pending" },
+  { key: "diproses",   label: "Diproses" },
+  { key: "dikirim",    label: "Dikirim" },
+  { key: "selesai",    label: "Selesai" },
+  { key: "dibatalkan", label: "Dibatalkan" },
+] as const;
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatRevenue(n: number) {
+  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000)     return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function ToastList({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`flex items-center gap-3 rounded-2xl border px-5 py-4 text-sm font-bold shadow-xl backdrop-blur-xl transition-all ${
+            t.type === "success"
+              ? "border-green-500/30 bg-green-900/80 text-green-200"
+              : "border-red-500/30 bg-red-900/80 text-red-200"
+          }`}
+        >
+          {t.type === "success"
+            ? <CheckCircle2 size={16} className="shrink-0" />
+            : <X size={16} className="shrink-0" />}
+          {t.message}
+          <button onClick={() => onDismiss(t.id)} className="ml-2 opacity-60 hover:opacity-100">
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeleteModal({
+  order,
+  onConfirm,
+  onCancel,
+  loading,
+}: {
+  order: Order;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-[32px] border border-white/10 bg-[#0a0c14] p-8 shadow-2xl">
+        <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/20">
+          <Trash2 size={24} className="text-red-400" />
+        </div>
+        <h2 className="mt-4 text-2xl font-black text-white">Hapus Pesanan?</h2>
+        <p className="mt-2 text-white/50">
+          Pesanan <span className="font-bold text-white">#{order.id} – {order.customer_name}</span> akan dihapus permanen dan tidak bisa dikembalikan.
+        </p>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-2xl border border-white/10 bg-white/10 py-3 font-bold text-white transition hover:bg-white/20"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvoicePrint({ order }: { order: Order }) {
+  return (
+    <div
+      style={{
+        width: "794px", minHeight: "1123px", background: "#fff",
+        color: "#111", padding: "56px", fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: "28px", fontWeight: 900, margin: 0 }}>Markas iPhone</h1>
+          <p style={{ color: "#666", marginTop: "4px" }}>Premium Apple Store</p>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ fontSize: "12px", color: "#999", margin: 0 }}>INVOICE</p>
+          <p style={{ fontSize: "28px", fontWeight: 900, margin: "4px 0 0" }}>#{order.id}</p>
+        </div>
+      </div>
+
+      <hr style={{ margin: "32px 0", borderColor: "#eee" }} />
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+        <div>
+          <p style={{ fontSize: "11px", color: "#999", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Data Customer</p>
+          <p style={{ marginTop: "8px", fontWeight: 700, fontSize: "18px" }}>{order.customer_name}</p>
+          <p style={{ color: "#555" }}>{order.phone}</p>
+          <p style={{ color: "#555" }}>{order.address}</p>
+        </div>
+        <div>
+          <p style={{ fontSize: "11px", color: "#999", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Detail Invoice</p>
+          <p style={{ marginTop: "8px", color: "#555" }}>Tanggal: {formatDate(order.created_at)}</p>
+          <p style={{ color: "#555" }}>Status: <span style={{ fontWeight: 700 }}>{STATUS_CONFIG[order.status]?.label ?? order.status}</span></p>
+          <p style={{ color: "#555" }}>Pembayaran: Transfer BCA</p>
+        </div>
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "32px" }}>
+        <thead>
+          <tr style={{ background: "#f5f5f7" }}>
+            <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "13px" }}>Produk</th>
+            <th style={{ padding: "14px 16px", textAlign: "right", fontSize: "13px" }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ padding: "16px", borderBottom: "1px solid #eee" }}>{order.product}</td>
+            <td style={{ padding: "16px", borderBottom: "1px solid #eee", textAlign: "right", fontWeight: 700 }}>
+              {order.total_price}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ padding: "16px", fontWeight: 700 }}>Total Pembayaran</td>
+            <td style={{ padding: "16px", textAlign: "right", fontWeight: 900, fontSize: "20px" }}>
+              {order.total_price}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style={{ marginTop: "60px", color: "#999", fontSize: "13px" }}>
+        Terima kasih sudah berbelanja di Markas iPhone. Barang garansi resmi Apple Indonesia.
+      </p>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
   const router = useRouter();
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [orders, setOrders]               = useState<Order[]>([]);
+  const [stats, setStats]                 = useState<Stats | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [updatingId, setUpdatingId]       = useState<number | null>(null);
+  const [deletingId, setDeletingId]       = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget]   = useState<Order | null>(null);
+  const [printTarget, setPrintTarget]     = useState<Order | null>(null);
+  const [search, setSearch]               = useState("");
+  const [filterStatus, setFilterStatus]   = useState<string>("all");
+  const [toasts, setToasts]               = useState<Toast[]>([]);
+  const toastCounter                      = useRef(0);
 
-  const [stats, setStats] = useState({
-    total_orders: 0,
-    pending_orders: 0,
-    completed_orders: 0,
-    total_revenue: 0,
-  });
-
+  // ── Auth check ──
   useEffect(() => {
-    const isLogin = localStorage.getItem("admin_logged_in");
-
-    if (isLogin !== "true") {
+    if (localStorage.getItem("admin_logged_in") !== "true") {
       router.push("/rahasia-admin-markas/login");
       return;
     }
-
-    getOrders();
-    getDashboard();
+    fetchAll();
   }, [router]);
 
-  const getDashboard = async () => {
-    const res = await fetch("/api/dashboard");
-    const data = await res.json();
-    setStats(data);
-  };
+  // ── Auto-dismiss toasts ──
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timer = setTimeout(() => setToasts((t) => t.slice(1)), 4000);
+    return () => clearTimeout(timer);
+  }, [toasts]);
 
-  const getOrders = async () => {
+  // ── Data fetching ──
+  async function fetchAll() {
+    await Promise.all([fetchOrders(), fetchStats()]);
+  }
+
+  async function fetchOrders() {
     try {
-      setLoading(true);
-      const res = await fetch("/api/orders");
+      setLoadingOrders(true);
+      const res  = await fetch("/api/orders");
       const data = await res.json();
       setOrders(Array.isArray(data) ? data : []);
+    } catch {
+      addToast("Gagal memuat pesanan", "error");
     } finally {
-      setLoading(false);
+      setLoadingOrders(false);
     }
-  };
+  }
 
-  const updateStatus = async (id: number, status: string) => {
-    const res = await fetch("/api/orders", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.message || "Gagal update status");
-      return;
+  async function fetchStats() {
+    try {
+      const res  = await fetch("/api/dashboard");
+      const data = await res.json();
+      setStats(data);
+    } catch {
+      /* silent – stats tidak kritis */
     }
+  }
 
-    getOrders();
-    getDashboard();
-  };
+  // ── Toast helper ──
+  function addToast(message: string, type: "success" | "error") {
+    const id = ++toastCounter.current;
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }
 
-  const downloadInvoice = async (order: Order) => {
-    setSelectedOrder(order);
+  function dismissToast(id: number) {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
 
-    setTimeout(async () => {
+  // ── Update status ──
+  async function updateStatus(order: Order, status: OrderStatus) {
+    setUpdatingId(order.id);
+    try {
+      const res = await fetch("/api/orders", {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ id: order.id, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      addToast(`Status diubah ke "${STATUS_CONFIG[status].label}"`, "success");
+      await fetchAll();
+    } catch (err: any) {
+      addToast(err.message ?? "Gagal update status", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  // ── Delete ──
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
+    try {
+      const res = await fetch(`/api/orders?id=${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      addToast("Pesanan dihapus", "success");
+      setDeleteTarget(null);
+      await fetchAll();
+    } catch (err: any) {
+      addToast(err.message ?? "Gagal hapus pesanan", "error");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // ── Download invoice ──
+  async function downloadInvoice(order: Order) {
+    setPrintTarget(order);
+    await new Promise((r) => setTimeout(r, 300));
+
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF }       = await import("jspdf");
+
       if (!invoiceRef.current) return;
 
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-      });
-
+      const canvas  = await html2canvas(invoiceRef.current, { scale: 2, backgroundColor: "#fff" });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const width = pdf.internal.pageSize.getWidth();
-      const height = (canvas.height * width) / canvas.width;
+      const pdf     = new jsPDF("p", "mm", "a4");
+      const width   = pdf.internal.pageSize.getWidth();
+      const height  = (canvas.height * width) / canvas.width;
 
       pdf.addImage(imgData, "PNG", 0, 0, width, height);
       pdf.save(`invoice-markas-iphone-${order.id}.pdf`);
-    }, 300);
-  };
+      addToast("Invoice berhasil diunduh", "success");
+    } catch {
+      addToast("Gagal mengunduh invoice", "error");
+    } finally {
+      setPrintTarget(null);
+    }
+  }
 
-  const filteredOrders = orders.filter((order) => {
-    const keyword = search.toLowerCase();
-
-    return (
-      order.customer_name.toLowerCase().includes(keyword) ||
-      order.phone.includes(search) ||
-      order.product.toLowerCase().includes(keyword) ||
-      String(order.id).includes(search)
-    );
+  // ── Filtered list ──
+  const displayed = orders.filter((o) => {
+    const q = search.toLowerCase();
+    const matchSearch =
+      o.customer_name.toLowerCase().includes(q) ||
+      o.phone.includes(search) ||
+      o.product.toLowerCase().includes(q) ||
+      String(o.id).includes(search);
+    const matchStatus = filterStatus === "all" || o.status === filterStatus;
+    return matchSearch && matchStatus;
   });
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <main className="min-h-screen overflow-hidden bg-black p-6 text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb55_0%,transparent_35%),radial-gradient(circle_at_bottom_right,#9333ea55_0%,transparent_35%)]" />
+      {/* Background */}
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb44_0%,transparent_40%),radial-gradient(circle_at_bottom_right,#9333ea44_0%,transparent_40%)]" />
 
       <section className="relative z-10 mx-auto max-w-7xl">
-        <div className="mb-10 flex flex-wrap items-center justify-between gap-5">
+
+        {/* ── Header ── */}
+        <div className="mb-10 flex flex-wrap items-start justify-between gap-5">
           <div>
             <Link
               href="/rahasia-admin-markas/dashboard"
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white/70 backdrop-blur-xl hover:text-white"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-2.5 text-sm font-bold text-white/70 backdrop-blur-xl transition hover:text-white"
             >
-              <ArrowLeft size={16} />
-              Dashboard
+              <ArrowLeft size={15} /> Dashboard
             </Link>
-
-            <p className="mb-3 text-sm font-black uppercase tracking-[0.3em] text-blue-300">
-              Order Manager
-            </p>
-
-            <h1 className="text-6xl font-black tracking-[-0.07em]">
-              Pesanan.
-            </h1>
-
-            <p className="mt-4 text-lg text-white/50">
-              Lihat order masuk, statistik, dan cetak nota transaksi.
-            </p>
+            <p className="mb-2 text-xs font-black uppercase tracking-[0.3em] text-blue-300">Order Manager</p>
+            <h1 className="text-5xl font-black tracking-[-0.06em] md:text-6xl">Pesanan.</h1>
+            <p className="mt-3 text-base text-white/50">Kelola pesanan, ubah status, dan cetak invoice.</p>
           </div>
 
           <button
-            onClick={() => {
-              getOrders();
-              getDashboard();
-            }}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-6 py-3 font-black text-white backdrop-blur-xl transition hover:bg-white/20"
+            onClick={fetchAll}
+            disabled={loadingOrders}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-3 font-bold text-white backdrop-blur-xl transition hover:bg-white/20 disabled:opacity-50"
           >
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={16} className={loadingOrders ? "animate-spin" : ""} />
             Refresh
           </button>
         </div>
 
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-            <p className="text-sm text-zinc-400">Total Pesanan</p>
-            <h2 className="text-3xl font-bold text-white">
-              {stats.total_orders}
-            </h2>
-          </div>
-
-          <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-6">
-            <p className="text-sm text-yellow-300">Pending</p>
-            <h2 className="text-3xl font-bold text-yellow-400">
-              {stats.pending_orders}
-            </h2>
-          </div>
-
-          <div className="rounded-3xl border border-green-500/20 bg-green-500/10 p-6">
-            <p className="text-sm text-green-300">Selesai</p>
-            <h2 className="text-3xl font-bold text-green-400">
-              {stats.completed_orders}
-            </h2>
-          </div>
-
-          <div className="rounded-3xl border border-blue-500/20 bg-blue-500/10 p-6">
-            <p className="text-sm text-blue-300">Omset</p>
-            <h2 className="text-2xl font-bold text-blue-400">
-              Rp {stats.total_revenue.toLocaleString("id-ID")}
-            </h2>
-          </div>
+        {/* ── Stats ── */}
+        <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            { icon: <ShoppingBag size={18} className="text-blue-300" />,   label: "Total Pesanan", value: stats?.total_orders ?? "–",                 color: "border-white/10 bg-white/10" },
+            { icon: <Clock size={18} className="text-yellow-300" />,       label: "Pending",       value: stats?.pending_orders ?? "–",               color: "border-yellow-500/20 bg-yellow-500/10" },
+            { icon: <CheckCircle2 size={18} className="text-green-300" />, label: "Selesai",       value: stats?.completed_orders ?? "–",             color: "border-green-500/20 bg-green-500/10" },
+            { icon: <TrendingUp size={18} className="text-purple-300" />,  label: "Total Omset",   value: stats ? formatRevenue(stats.total_revenue) : "–", color: "border-purple-500/20 bg-purple-500/10" },
+          ].map((s, i) => (
+            <div key={i} className={`rounded-3xl border p-5 backdrop-blur-xl ${s.color}`}>
+              {s.icon}
+              <p className="mt-3 text-xs font-bold text-white/50">{s.label}</p>
+              <p className="mt-1 text-2xl font-black">{s.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="mb-6">
-          <div className="relative">
-            <Search
-              size={20}
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-white/40"
-            />
-
+        {/* ── Search + Filter ── */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-white/40" />
             <input
               type="text"
-              placeholder="Cari nama, invoice, nomor HP, atau produk..."
+              placeholder="Cari nama, invoice, HP, atau produk…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-3xl border border-white/10 bg-white/5 py-5 pl-14 pr-6 font-bold text-white placeholder:text-white/40 backdrop-blur-xl outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
+              className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-12 pr-5 font-bold text-white placeholder:text-white/30 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
             />
           </div>
         </div>
 
-        {filteredOrders.length === 0 ? (
-          <div className="rounded-[42px] border border-white/10 bg-white/10 p-10 text-center backdrop-blur-2xl">
-            <Receipt className="mx-auto mb-5 text-blue-300" size={52} />
-            <h2 className="mb-2 text-3xl font-black">
-              {search ? "Order tidak ditemukan" : "Belum ada pesanan"}
-            </h2>
-            <p className="text-white/50">
-              {search
-                ? "Coba pakai nama, invoice, nomor HP, atau produk lain."
-                : "Pesanan dari checkout akan muncul di sini."}
+        {/* Filter tabs */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {FILTER_TABS.map((tab) => {
+            const count = tab.key === "all"
+              ? orders.length
+              : orders.filter((o) => o.status === tab.key).length;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setFilterStatus(tab.key)}
+                className={`rounded-full border px-4 py-2 text-sm font-bold transition ${
+                  filterStatus === tab.key
+                    ? "border-blue-500 bg-blue-600 text-white"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {tab.label}
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-black ${
+                  filterStatus === tab.key ? "bg-white/20" : "bg-white/10"
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Loading ── */}
+        {loadingOrders && (
+          <div className="flex items-center justify-center py-20 text-white/40">
+            <Loader2 size={32} className="animate-spin" />
+          </div>
+        )}
+
+        {/* ── Empty state ── */}
+        {!loadingOrders && displayed.length === 0 && (
+          <div className="rounded-[40px] border border-white/10 bg-white/5 p-14 text-center">
+            <Package size={48} className="mx-auto mb-4 text-white/20" />
+            <h3 className="text-2xl font-black text-white/60">
+              {search || filterStatus !== "all" ? "Tidak ada pesanan yang cocok" : "Belum ada pesanan"}
+            </h3>
+            <p className="mt-2 text-white/30">
+              {search || filterStatus !== "all"
+                ? "Coba ubah kata kunci atau filter status."
+                : "Pesanan dari halaman checkout akan muncul di sini."}
             </p>
           </div>
-        ) : (
-          <div className="grid gap-6">
-            {filteredOrders.map((order) => (
-              <div
-                key={order.id}
-                className="rounded-[36px] border border-white/10 bg-white/10 p-6 shadow-[0_30px_100px_rgba(0,0,0,0.25)] backdrop-blur-2xl"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-5">
-                  <div>
-                    <p className="mb-2 text-sm font-black uppercase tracking-[0.25em] text-blue-300">
-                      Invoice #{order.id}
-                    </p>
+        )}
 
-                    <h2 className="text-3xl font-black">
-                      {order.customer_name}
-                    </h2>
+        {/* ── Order list ── */}
+        {!loadingOrders && (
+          <div className="grid gap-5">
+            {displayed.map((order) => {
+              const sc   = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.pending;
+              const busy = updatingId === order.id;
 
-                    <p className="mt-2 text-white/50">{order.phone}</p>
-                    <p className="mt-1 text-white/50">{order.address}</p>
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-[32px] border border-white/10 bg-white/[0.06] p-6 backdrop-blur-xl"
+                >
+                  {/* Top row */}
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-300/80">
+                        Invoice #{order.id}
+                      </p>
+                      <h2 className="mt-1 text-2xl font-black">{order.customer_name}</h2>
+                      <p className="mt-1 text-sm text-white/50">{order.phone}</p>
+                      {order.customer_email && (
+                        <p className="text-sm text-white/40">{order.customer_email}</p>
+                      )}
+                      <p className="mt-1 text-sm text-white/40">{order.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-block rounded-full border px-4 py-1.5 text-xs font-black ${sc.bg} ${sc.color}`}>
+                        {sc.label}
+                      </span>
+                      <p className="mt-3 text-2xl font-black">{order.total_price}</p>
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <p
-                      className={`rounded-full px-4 py-2 text-sm font-black ${
-                        order.status === "selesai"
-                          ? "bg-green-500/20 text-green-300"
-                          : "bg-yellow-500/20 text-yellow-300"
-                      }`}
-                    >
-                      {order.status}
-                    </p>
+                  {/* Divider */}
+                  <div className="my-5 h-px bg-white/10" />
 
-                    <p className="mt-4 text-3xl font-black">
-                      {order.total_price}
-                    </p>
-                  </div>
-                </div>
+                  {/* Bottom row */}
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-white/40">Produk</p>
+                      <p className="mt-0.5 font-bold text-white">{order.product}</p>
+                      <p className="mt-1 text-xs text-white/30">{formatDate(order.created_at)}</p>
+                    </div>
 
-                <div className="my-6 h-px bg-white/10" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Advance status button */}
+                      {sc.next && (
+                        <button
+                          onClick={() => updateStatus(order, sc.next!)}
+                          disabled={busy}
+                          className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {busy
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <CheckCircle2 size={14} />}
+                          Tandai {STATUS_CONFIG[sc.next].label}
+                        </button>
+                      )}
 
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-white/40">Produk</p>
-                    <p className="text-xl font-black">{order.product}</p>
-                    <p className="mt-2 text-sm text-white/35">
-                      {new Date(order.created_at).toLocaleString("id-ID")}
-                    </p>
-                  </div>
+                      {/* Cancel – only if not done/cancelled */}
+                      {order.status !== "selesai" && order.status !== "dibatalkan" && (
+                        <button
+                          onClick={() => updateStatus(order, "dibatalkan")}
+                          disabled={busy}
+                          className="rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
+                        >
+                          Batalkan
+                        </button>
+                      )}
 
-                  <div className="flex flex-wrap gap-3">
-                    {order.status !== "selesai" && (
+                      {/* Download invoice */}
                       <button
-                        onClick={() => updateStatus(order.id, "selesai")}
-                        className="rounded-full bg-green-600 px-5 py-3 font-black text-white hover:bg-green-700"
+                        onClick={() => downloadInvoice(order)}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
                       >
-                        Tandai Selesai
+                        <Download size={14} />
+                        Invoice
                       </button>
-                    )}
 
-                    <button
-                      onClick={() => downloadInvoice(order)}
-                      className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 font-black text-white hover:bg-blue-700"
-                    >
-                      <Download size={18} />
-                      Cetak Nota
-                    </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => setDeleteTarget(order)}
+                        className="rounded-full border border-red-500/20 bg-transparent p-2.5 text-red-400 transition hover:bg-red-500/20"
+                        title="Hapus pesanan"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
 
-      <div className="fixed -left-[9999px] top-0">
-        {selectedOrder && (
-          <div
-            ref={invoiceRef}
-            style={{
-              width: "794px",
-              minHeight: "1123px",
-              background: "#ffffff",
-              color: "#111111",
-              padding: "56px",
-              fontFamily: "Arial, sans-serif",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <div>
-                <h1 style={{ fontSize: "34px", margin: 0 }}>Markas iPhone</h1>
-                <p style={{ marginTop: "8px", color: "#666" }}>
-                  Premium Apple Store
-                </p>
-              </div>
-
-              <div style={{ textAlign: "right" }}>
-                <h2 style={{ margin: 0 }}>INVOICE</h2>
-                <p>#{selectedOrder.id}</p>
-              </div>
-            </div>
-
-            <hr style={{ margin: "36px 0" }} />
-
-            <h3>Data Customer</h3>
-            <p>
-              <b>Nama:</b> {selectedOrder.customer_name}
-            </p>
-            <p>
-              <b>No. WhatsApp:</b> {selectedOrder.phone}
-            </p>
-            <p>
-              <b>Alamat:</b> {selectedOrder.address}
-            </p>
-
-            <div style={{ marginTop: "36px" }}>
-              <h3>Detail Pesanan</h3>
-
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  marginTop: "16px",
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "#f5f5f7" }}>
-                    <th style={{ padding: "14px", textAlign: "left" }}>
-                      Produk
-                    </th>
-                    <th style={{ padding: "14px", textAlign: "right" }}>
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  <tr>
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eee",
-                      }}
-                    >
-                      {selectedOrder.product}
-                    </td>
-                    <td
-                      style={{
-                        padding: "14px",
-                        borderBottom: "1px solid #eee",
-                        textAlign: "right",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {selectedOrder.total_price}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div
-              style={{
-                marginTop: "36px",
-                padding: "24px",
-                background: "#f5f5f7",
-                borderRadius: "18px",
-              }}
-            >
-              <p>
-                <b>Status:</b> {selectedOrder.status}
-              </p>
-              <p>
-                <b>Tanggal:</b>{" "}
-                {new Date(selectedOrder.created_at).toLocaleString("id-ID")}
-              </p>
-              <p>
-                <b>Pembayaran:</b> Transfer Bank BCA
-              </p>
-            </div>
-
-            <p style={{ marginTop: "60px", color: "#666" }}>
-              Terima kasih sudah berbelanja di Markas iPhone.
-            </p>
+      {/* ── Hidden invoice template for PDF ── */}
+      <div className="fixed -left-[9999px] top-0 opacity-0">
+        {printTarget && (
+          <div ref={invoiceRef}>
+            <InvoicePrint order={printTarget} />
           </div>
         )}
       </div>
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteTarget && (
+        <DeleteModal
+          order={deleteTarget}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deletingId === deleteTarget.id}
+        />
+      )}
+
+      {/* ── Toast notifications ── */}
+      <ToastList toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
