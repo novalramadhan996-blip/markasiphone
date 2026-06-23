@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
   Copy,
@@ -11,10 +11,47 @@ import {
   ShieldCheck,
   Sparkles,
   User,
+  XCircle,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import Navbar from "../../components/Navbar";
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+type ToastType = "success" | "error";
+type Toast = { id: number; message: string; type: ToastType };
+
+let _toastCounter = 0;
+
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+      <AnimatePresence>
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-bold text-white shadow-2xl backdrop-blur-xl ${
+              t.type === "success" ? "bg-emerald-500/90" : "bg-red-500/90"
+            }`}
+          >
+            {t.type === "success" ? (
+              <CheckCircle2 size={18} />
+            ) : (
+              <XCircle size={18} />
+            )}
+            {t.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
@@ -25,6 +62,8 @@ export default function CheckoutPage() {
   const rekening = "1234567890";
   const [loading, setLoading] = useState(false);
 
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
   const [form, setForm] = useState({
     customer_name: "",
     customer_email: "",
@@ -32,17 +71,37 @@ export default function CheckoutPage() {
     address: "",
   });
 
-  const inputClass =
-    "w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 font-bold text-white outline-none placeholder:text-white/35 shadow-[inset_0_0_0_9999px_rgba(0,0,0,0.25)] transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500";
+  // ─── Toast helpers ────────────────────────────────────────────────────────
+
+  function showToast(message: string, type: ToastType = "success") {
+    _toastCounter += 1;
+    const id = _toastCounter;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      3500
+    );
+  }
+
+  // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const copyRekening = async () => {
-    await navigator.clipboard.writeText(rekening);
-    alert("Nomor rekening berhasil disalin");
+    try {
+      await navigator.clipboard.writeText(rekening);
+      showToast("Nomor rekening berhasil disalin", "success");
+    } catch {
+      showToast("Gagal menyalin rekening", "error");
+    }
   };
 
   const handleOrder = async () => {
-    if (!form.customer_name || !form.customer_email || !form.phone || !form.address) {
-      alert("Lengkapi data checkout");
+    if (
+      !form.customer_name ||
+      !form.customer_email ||
+      !form.phone ||
+      !form.address
+    ) {
+      showToast("Lengkapi semua data checkout", "error");
       return;
     }
 
@@ -51,9 +110,7 @@ export default function CheckoutPage() {
 
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_name: form.customer_name,
           customer_email: form.customer_email,
@@ -67,9 +124,11 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message || "Gagal membuat order");
+        showToast(data.message || "Gagal membuat order", "error");
         return;
       }
+
+      showToast("Pesanan berhasil dibuat! Mengalihkan ke WhatsApp…", "success");
 
       const waText = encodeURIComponent(`Halo Admin Markas iPhone,
 
@@ -84,23 +143,35 @@ Total: ${harga}
 
 Saya akan mengirim bukti transfer di chat ini.`);
 
-      window.location.href = `https://wa.me/6281386824603?text=${waText}`;
+      // Beri jeda sebentar agar toast sempat terbaca sebelum redirect
+      setTimeout(() => {
+        window.location.href = `https://wa.me/6281386824603?text=${waText}`;
+      }, 1200);
     } catch (error) {
       console.error(error);
-      alert("Terjadi error");
+      showToast("Terjadi kesalahan pada server", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // ─── Styles ───────────────────────────────────────────────────────────────
+
+  const inputClass =
+    "w-full rounded-2xl border border-white/10 bg-black/40 py-4 pl-12 pr-4 font-bold text-white outline-none placeholder:text-white/35 shadow-[inset_0_0_0_9999px_rgba(0,0,0,0.25)] transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500";
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
+      <ToastContainer toasts={toasts} />
       <Navbar />
 
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb55_0%,transparent_35%),radial-gradient(circle_at_bottom_right,#9333ea55_0%,transparent_35%)]" />
 
       <section className="relative z-10 mx-auto max-w-7xl px-6 py-32">
         <div className="grid gap-8 lg:grid-cols-2">
+          {/* ── Kolom kiri: form ── */}
           <motion.div
             initial={{ opacity: 0, x: -35 }}
             animate={{ opacity: 1, x: 0 }}
@@ -120,6 +191,7 @@ Saya akan mengirim bukti transfer di chat ini.`);
               Lengkapi data checkout. Invoice akan dikirim ke email customer.
             </p>
 
+            {/* Ringkasan produk */}
             <div className="rounded-[34px] border border-white/10 bg-black/30 p-7">
               <div className="mb-5 flex items-center justify-between">
                 <div>
@@ -144,6 +216,7 @@ Saya akan mengirim bukti transfer di chat ini.`);
               </div>
             </div>
 
+            {/* Form input */}
             <div className="mt-8 space-y-4">
               <div className="relative">
                 <User
@@ -184,13 +257,18 @@ Saya akan mengirim bukti transfer di chat ini.`);
                 <input
                   placeholder="Nomor WhatsApp"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, phone: e.target.value })
+                  }
                   className={inputClass}
                 />
               </div>
 
               <div className="relative">
-                <MapPin className="absolute left-4 top-6 text-blue-300" size={18} />
+                <MapPin
+                  className="absolute left-4 top-6 text-blue-300"
+                  size={18}
+                />
                 <textarea
                   placeholder="Alamat lengkap"
                   value={form.address}
@@ -202,6 +280,7 @@ Saya akan mengirim bukti transfer di chat ini.`);
               </div>
             </div>
 
+            {/* Info cards */}
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
                 <ShieldCheck className="mb-4 text-blue-300" />
@@ -221,6 +300,7 @@ Saya akan mengirim bukti transfer di chat ini.`);
             </div>
           </motion.div>
 
+          {/* ── Kolom kanan: pembayaran ── */}
           <motion.div
             initial={{ opacity: 0, x: 35 }}
             animate={{ opacity: 1, x: 0 }}

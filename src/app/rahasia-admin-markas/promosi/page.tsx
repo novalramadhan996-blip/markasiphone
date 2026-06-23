@@ -1,117 +1,127 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft,
+  AlertTriangle,
+  Calendar,
   CheckCircle2,
-  Clock,
-  Loader2,
-  Package,
+  Pencil,
+  Percent,
   Plus,
-  RefreshCw,
-  Save,
   Tag,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
-  X,
+  XCircle,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Product = {
-  id: number;
-  name: string;
-  image_url: string;
-  base_price: number;
-  is_active: number;
-};
-
-type Promotion = {
+type Promo = {
   id: number;
   product_id: number;
+  product_name: string;
   discount_percent: number;
   is_active: number;
   valid_until: string | null;
-  is_expired: boolean;
-  product_name: string;
-  product_image: string;
-  base_price: number;
+  created_at: string;
+  is_expired: boolean; // dikirim langsung dari API
 };
 
-type Toast = { id: number; message: string; type: "success" | "error" };
+type ProductOption = {
+  id: number;
+  name: string;
+  category: string;
+};
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────────
 
-function rupiah(n: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
-}
+type ToastType = "success" | "error";
+type Toast = { id: number; message: string; type: ToastType };
 
-function formatDate(iso: string | null) {
-  if (!iso) return "Tanpa batas waktu";
-  return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
+let _counter = 0;
 
-function finalPrice(base: number, discount: number) {
-  return Math.round(base * (1 - discount / 100));
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function ToastList({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`flex items-center gap-3 rounded-2xl border px-5 py-4 text-sm font-bold shadow-xl backdrop-blur-xl ${
-            t.type === "success"
-              ? "border-green-500/30 bg-green-900/80 text-green-200"
-              : "border-red-500/30 bg-red-900/80 text-red-200"
-          }`}
-        >
-          {t.type === "success" ? <CheckCircle2 size={16} className="shrink-0" /> : <X size={16} className="shrink-0" />}
-          {t.message}
-          <button onClick={() => onDismiss(t.id)} className="ml-2 opacity-60 hover:opacity-100">
-            <X size={14} />
-          </button>
-        </div>
-      ))}
+      <AnimatePresence>
+        {toasts.map((t) => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-bold text-white shadow-2xl backdrop-blur-xl ${
+              t.type === "success" ? "bg-emerald-500/90" : "bg-red-500/90"
+            }`}
+          >
+            {t.type === "success" ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+            {t.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
 
-function DeleteModal({
-  promo, onConfirm, onCancel, loading,
+// ─── Confirm Modal ────────────────────────────────────────────────────────────
+
+function ConfirmModal({
+  open,
+  message,
+  onConfirm,
+  onCancel,
 }: {
-  promo: Promotion; onConfirm: () => void; onCancel: () => void; loading: boolean;
+  open: boolean;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
+  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-[32px] border border-white/10 bg-[#0a0c14] p-8 shadow-2xl">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/20">
-          <Trash2 size={24} className="text-red-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="mx-4 w-full max-w-md rounded-[32px] border border-white/10 bg-[#0d0d0d] p-8 shadow-2xl"
+      >
+        <div className="mb-5 flex items-center gap-3 text-red-400">
+          <AlertTriangle size={24} />
+          <h3 className="text-xl font-black">Konfirmasi Hapus</h3>
         </div>
-        <h2 className="text-2xl font-black text-white">Hapus Promo?</h2>
-        <p className="mt-2 text-white/50">
-          Promo <span className="font-bold text-white">{promo.discount_percent}% untuk {promo.product_name}</span> akan dihapus permanen.
-        </p>
-        <div className="mt-6 flex gap-3">
-          <button onClick={onCancel} className="flex-1 rounded-2xl border border-white/10 bg-white/10 py-3 font-bold text-white transition hover:bg-white/20">
+        <p className="mb-8 text-white/60">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-white/10 bg-white/10 px-6 py-3 text-sm font-black text-white hover:bg-white/20"
+          >
             Batal
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            disabled={loading}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-60"
+            className="rounded-full bg-red-500 px-6 py-3 text-sm font-black text-white hover:bg-red-600"
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             Hapus
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "Tidak ada";
+  return new Date(dateStr).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -119,406 +129,477 @@ function DeleteModal({
 export default function PromosiPage() {
   const router = useRouter();
 
-  const [promotions, setPromotions]     = useState<Promotion[]>([]);
-  const [products, setProducts]         = useState<Product[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [submitting, setSubmitting]     = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Promotion | null>(null);
-  const [deletingId, setDeletingId]     = useState<number | null>(null);
-  const [togglingId, setTogglingId]     = useState<number | null>(null);
-  const [toasts, setToasts]             = useState<Toast[]>([]);
-  const toastCounter                    = useRef(0);
+  const [promos, setPromos] = useState<Promo[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Form state
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [discountPercent, setDiscountPercent]     = useState("");
-  const [validUntil, setValidUntil]               = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
 
-  // ── Auth check ──
+  const [form, setForm] = useState({
+    product_id: "",
+    discount_percent: "",
+    valid_until: "",
+  });
+
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean;
+    promoId: number | null;
+    promoName: string;
+  }>({ open: false, promoId: null, promoName: "" });
+
+  // ─── Auth check ──────────────────────────────────────────────────────────
+
   useEffect(() => {
-    if (localStorage.getItem("admin_logged_in") !== "true") {
-      router.push("/rahasia-admin-markas/login");
-      return;
-    }
-    fetchAll();
+    const isLoggedIn = localStorage.getItem("markas_admin_logged_in");
+    if (!isLoggedIn) router.replace("/rahasia-admin-markas/login");
   }, [router]);
 
-  useEffect(() => {
-    if (toasts.length === 0) return;
-    const t = setTimeout(() => setToasts((prev) => prev.slice(1)), 4000);
-    return () => clearTimeout(t);
-  }, [toasts]);
+  // ─── Toast helpers ────────────────────────────────────────────────────────
 
-  function addToast(message: string, type: "success" | "error") {
-    const id = ++toastCounter.current;
+  function showToast(message: string, type: ToastType = "success") {
+    _counter += 1;
+    const id = _counter;
     setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   }
 
-  function dismissToast(id: number) {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }
+  // ─── Fetch ────────────────────────────────────────────────────────────────
 
-  async function fetchAll() {
-    setLoading(true);
-    await Promise.all([fetchPromotions(), fetchProducts()]);
-    setLoading(false);
-  }
-
-  async function fetchPromotions() {
+  async function fetchPromos() {
     try {
-      const res  = await fetch("/api/promotions");
+      const res = await fetch("/api/promotions");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // GET /api/promotions mengembalikan array langsung (bukan { promotions: [...] })
       const data = await res.json();
-      setPromotions(Array.isArray(data) ? data : []);
+      setPromos(Array.isArray(data) ? data : []);
     } catch {
-      addToast("Gagal memuat data promosi", "error");
+      showToast("Gagal memuat data promo", "error");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function fetchProducts() {
     try {
-      const res  = await fetch("/api/products");
+      const res = await fetch("/api/products");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
+      // products-route-v2 mengembalikan array langsung
+      const list = Array.isArray(data) ? data : (data.products ?? []);
+      const active = list
+        .filter((p: { is_active: number }) => p.is_active === 1)
+        .map((p: { id: number; name: string; category: string }) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+        }));
+      setProducts(active);
     } catch {
-      /* silent */
+      showToast("Gagal memuat daftar produk", "error");
     }
   }
 
-  // Produk yang belum punya promo aktif — supaya admin tidak pilih produk yang sudah ada promonya
-  const productsWithoutActivePromo = products.filter((p) => {
-    const hasActivePromo = promotions.some(
-      (promo) => promo.product_id === p.id && promo.is_active === 1 && !promo.is_expired
-    );
-    return !hasActivePromo;
-  });
+  useEffect(() => {
+    fetchPromos();
+    fetchProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Form helpers ─────────────────────────────────────────────────────────
 
   function resetForm() {
-    setSelectedProductId("");
-    setDiscountPercent("");
-    setValidUntil("");
+    setForm({ product_id: "", discount_percent: "", valid_until: "" });
+    setEditMode(false);
+    setEditId(null);
+    setShowForm(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function openAddForm() {
+    resetForm();
+    setShowForm(true);
+  }
 
-    if (!selectedProductId || !discountPercent) {
-      addToast("Pilih produk dan isi persentase diskon", "error");
+  function openEditForm(promo: Promo) {
+    setForm({
+      product_id: String(promo.product_id),
+      discount_percent: String(promo.discount_percent),
+      valid_until: promo.valid_until ? promo.valid_until.slice(0, 16) : "",
+    });
+    setEditMode(true);
+    setEditId(promo.id);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ─── CRUD ─────────────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    if (!form.product_id || !form.discount_percent) {
+      showToast("Pilih produk dan masukkan persen diskon", "error");
       return;
     }
 
-    const pct = Number(discountPercent);
-    if (pct <= 0 || pct > 90) {
-      addToast("Diskon harus antara 1% - 90%", "error");
+    const pct = Number(form.discount_percent);
+    if (isNaN(pct) || pct < 1 || pct > 90) {
+      showToast("Diskon harus antara 1–90%", "error");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/promotions", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          product_id:       Number(selectedProductId),
-          discount_percent: pct,
-          valid_until:      validUntil || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Gagal menambah promo");
-      addToast("Promo berhasil ditambahkan", "success");
+      if (editMode && editId !== null) {
+        const res = await fetch("/api/promotions", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editId,
+            discount_percent: pct,
+            valid_until: form.valid_until || null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? "Gagal update promo");
+        showToast("Promo berhasil diupdate");
+      } else {
+        const res = await fetch("/api/promotions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: Number(form.product_id),
+            discount_percent: pct,
+            valid_until: form.valid_until || null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? "Gagal tambah promo");
+        showToast("Promo berhasil ditambahkan");
+      }
+
       resetForm();
-      fetchAll();
-    } catch (err: any) {
-      addToast(err.message ?? "Terjadi kesalahan", "error");
+      await fetchPromos();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Terjadi error", "error");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function toggleActive(promo: Promotion) {
-    setTogglingId(promo.id);
+  async function handleToggle(promo: Promo) {
     try {
       const res = await fetch("/api/promotions", {
-        method:  "PATCH",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ id: promo.id, is_active: promo.is_active === 1 ? false : true }),
+        body: JSON.stringify({
+          id: promo.id,
+          is_active: promo.is_active === 1 ? 0 : 1,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Gagal update status");
-      addToast(promo.is_active === 1 ? "Promo dinonaktifkan" : "Promo diaktifkan", "success");
-      fetchAll();
-    } catch (err: any) {
-      addToast(err.message ?? "Terjadi kesalahan", "error");
-    } finally {
-      setTogglingId(null);
+      if (!res.ok) throw new Error(data.message ?? "Gagal toggle promo");
+      showToast(promo.is_active === 1 ? "Promo dinonaktifkan" : "Promo diaktifkan");
+      await fetchPromos();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Terjadi error", "error");
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setDeletingId(deleteTarget.id);
+  function askDelete(promo: Promo) {
+    setConfirmModal({
+      open: true,
+      promoId: promo.id,
+      promoName: `${promo.product_name} (${promo.discount_percent}%)`,
+    });
+  }
+
+  async function handleDelete() {
+    if (!confirmModal.promoId) return;
+    setConfirmModal((prev) => ({ ...prev, open: false }));
     try {
-      const res  = await fetch(`/api/promotions?id=${deleteTarget.id}`, { method: "DELETE" });
+      // ⚠️  Route DELETE pakai query string: DELETE /api/promotions?id=X
+      const res = await fetch(`/api/promotions?id=${confirmModal.promoId}`, {
+        method: "DELETE",
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Gagal hapus");
-      addToast("Promo berhasil dihapus", "success");
-      setDeleteTarget(null);
-      fetchAll();
-    } catch (err: any) {
-      addToast(err.message ?? "Terjadi kesalahan", "error");
-    } finally {
-      setDeletingId(null);
+      if (!res.ok) throw new Error(data.message ?? "Gagal hapus promo");
+      showToast("Promo berhasil dihapus");
+      await fetchPromos();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Terjadi error", "error");
     }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  const inputClass =
+    "w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm font-bold text-white outline-none placeholder:text-white/30 transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/30";
+
   return (
-    <main className="min-h-screen overflow-hidden bg-black p-6 text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,#2563eb44_0%,transparent_40%),radial-gradient(circle_at_bottom_right,#9333ea44_0%,transparent_40%)]" />
+    <main className="min-h-screen bg-[#080808] text-white">
+      <ToastContainer toasts={toasts} />
 
-      <section className="relative z-10 mx-auto max-w-7xl">
+      <ConfirmModal
+        open={confirmModal.open}
+        message={`Yakin hapus promo "${confirmModal.promoName}"? Tindakan ini tidak bisa dibatalkan.`}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
+      />
 
-        {/* ── Header ── */}
-        <div className="mb-10 flex flex-wrap items-start justify-between gap-5">
+      <div className="mx-auto max-w-5xl px-6 py-12">
+        {/* Header */}
+        <div className="mb-10 flex items-center justify-between">
           <div>
-            <Link
-              href="/rahasia-admin-markas/dashboard"
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-2.5 text-sm font-bold text-white/70 backdrop-blur-xl transition hover:text-white"
-            >
-              <ArrowLeft size={15} /> Dashboard
-            </Link>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.3em] text-blue-300">Promotion Manager</p>
-            <h1 className="text-5xl font-black tracking-[-0.06em] md:text-6xl">Promosi.</h1>
-            <p className="mt-3 text-base text-white/50">Atur diskon otomatis per produk, langsung tampil di toko.</p>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-black uppercase tracking-widest text-blue-400">
+              <Tag size={12} />
+              Admin Panel
+            </div>
+            <h1 className="text-5xl font-black tracking-[-0.06em]">Promosi</h1>
+            <p className="mt-2 text-white/40">
+              Kelola diskon produk yang tampil otomatis di storefront.
+            </p>
           </div>
 
           <button
-            onClick={fetchAll}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-5 py-3 font-bold text-white backdrop-blur-xl transition hover:bg-white/20 disabled:opacity-50"
+            type="button"
+            onClick={openAddForm}
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-[0_8px_30px_rgba(37,99,235,0.4)] transition hover:scale-[1.03] hover:bg-blue-500"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <Plus size={16} />
+            Tambah Promo
           </button>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
+        {/* Form tambah / edit */}
+        <AnimatePresence>
+          {showForm && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-8 rounded-[40px] border border-white/10 bg-white/5 p-8 backdrop-blur-xl"
+            >
+              <h2 className="mb-6 text-2xl font-black">
+                {editMode ? "Edit Promo" : "Tambah Promo Baru"}
+              </h2>
 
-          {/* ── Form Panel ── */}
-          <form
-            onSubmit={handleSubmit}
-            className="sticky top-6 h-fit rounded-[40px] border border-white/10 bg-white/[0.06] p-7 backdrop-blur-2xl"
-          >
-            <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
-              <Plus size={26} className="text-emerald-300" />
-            </div>
-            <h2 className="mb-1 text-3xl font-black tracking-tight">Tambah Promo</h2>
-            <p className="mb-7 text-sm text-white/40">
-              Promo otomatis tampil di toko, customer tidak perlu kode apapun.
-            </p>
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Pilih produk */}
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-wider text-white/40">
+                    Produk
+                  </label>
+                  <select
+                    value={form.product_id}
+                    onChange={(e) => setForm({ ...form, product_id: e.target.value })}
+                    disabled={editMode}
+                    className={`${inputClass} ${editMode ? "cursor-not-allowed opacity-50" : ""}`}
+                  >
+                    <option value="" disabled>
+                      Pilih produk…
+                    </option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.category})
+                      </option>
+                    ))}
+                  </select>
+                  {editMode && (
+                    <p className="mt-1 text-xs text-white/30">
+                      Produk tidak bisa diubah. Hapus dan buat promo baru.
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-4">
-              {/* Pilih produk */}
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-white/50">Produk *</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-[#0d1117] px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25"
-                >
-                  <option value="">Pilih produk…</option>
-                  {productsWithoutActivePromo.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {rupiah(p.base_price)}</option>
-                  ))}
-                </select>
-                {productsWithoutActivePromo.length === 0 && !loading && (
-                  <p className="mt-1.5 text-xs text-yellow-400/80">
-                    Semua produk sudah punya promo aktif.
+                {/* Persen diskon */}
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-wider text-white/40">
+                    Diskon (%)
+                  </label>
+                  <div className="relative">
+                    <Percent
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30"
+                      size={16}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      placeholder="Contoh: 10"
+                      value={form.discount_percent}
+                      onChange={(e) =>
+                        setForm({ ...form, discount_percent: e.target.value })
+                      }
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                {/* Tanggal expired */}
+                <div>
+                  <label className="mb-2 block text-xs font-black uppercase tracking-wider text-white/40">
+                    Berlaku Hingga (opsional)
+                  </label>
+                  <div className="relative">
+                    <Calendar
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                      size={16}
+                    />
+                    <input
+                      type="datetime-local"
+                      value={form.valid_until}
+                      onChange={(e) =>
+                        setForm({ ...form, valid_until: e.target.value })
+                      }
+                      className={`${inputClass} pl-11`}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-white/30">
+                    Kosongkan jika tidak ada tanggal kadaluarsa.
                   </p>
-                )}
+                </div>
               </div>
 
-              {/* Diskon persen */}
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-white/50">Diskon (%) *</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={90}
-                  placeholder="Contoh: 10"
-                  value={discountPercent}
-                  onChange={(e) => setDiscountPercent(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm font-bold text-white placeholder:text-white/25 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25"
-                />
-                {selectedProductId && discountPercent && Number(discountPercent) > 0 && (
-                  (() => {
-                    const product = products.find((p) => p.id === Number(selectedProductId));
-                    if (!product) return null;
-                    return (
-                      <p className="mt-1.5 text-sm">
-                        <span className="text-white/40 line-through">{rupiah(product.base_price)}</span>{" "}
-                        <span className="font-bold text-emerald-400">
-                          {rupiah(finalPrice(product.base_price, Number(discountPercent)))}
-                        </span>
-                      </p>
-                    );
-                  })()
-                )}
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-7 py-3.5 text-sm font-black text-white shadow-[0_8px_30px_rgba(37,99,235,0.35)] transition hover:bg-blue-500 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={16} />
+                  {submitting
+                    ? "Menyimpan…"
+                    : editMode
+                    ? "Update Promo"
+                    : "Simpan Promo"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="rounded-full border border-white/10 bg-white/5 px-7 py-3.5 text-sm font-black text-white/60 transition hover:text-white"
+                >
+                  Batal
+                </button>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {/* Tanggal berakhir */}
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-white/50">
-                  Berlaku Sampai <span className="font-normal text-white/30">(opsional)</span>
-                </label>
-                <input
-                  type="date"
-                  value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
-                  min={new Date().toISOString().slice(0, 10)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm font-bold text-white outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25 [color-scheme:dark]"
-                />
-                <p className="mt-1.5 text-xs text-white/30">
-                  Kosongkan untuk promo tanpa batas waktu — nonaktifkan manual kapan saja.
-                </p>
-              </div>
+        {/* List promo */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-white/30">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              className="h-8 w-8 rounded-full border-2 border-white/20 border-t-blue-400"
+            />
+          </div>
+        ) : promos.length === 0 ? (
+          <div className="rounded-[40px] border border-white/10 bg-white/5 py-20 text-center">
+            <Tag size={40} className="mx-auto mb-4 text-white/20" />
+            <p className="text-lg font-black text-white/30">Belum ada promo</p>
+            <p className="mt-2 text-sm text-white/20">
+              Klik "Tambah Promo" untuk membuat promo pertama.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {promos.map((promo, i) => {
+              // Gunakan field is_expired dari API (sudah dihitung server-side)
+              const expired = promo.is_expired;
+              const active = promo.is_active === 1 && !expired;
 
-              <button
-                type="submit"
-                disabled={submitting || productsWithoutActivePromo.length === 0}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 font-black text-white transition hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {submitting
-                  ? <><Loader2 size={16} className="animate-spin" /> Menyimpan…</>
-                  : <><Save size={16} /> Simpan Promo</>}
-              </button>
-            </div>
-          </form>
+              return (
+                <motion.div
+                  key={promo.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex flex-col gap-4 rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between"
+                >
+                  {/* Info */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400">
+                      <Percent size={22} />
+                    </div>
 
-          {/* ── Promo List ── */}
-          <div>
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-black tracking-tight">Daftar Promo</h2>
-                <p className="text-sm text-white/40">
-                  {loading ? "Memuat…" : `${promotions.length} promo terdaftar`}
-                </p>
-              </div>
-            </div>
-
-            {loading && (
-              <div className="flex items-center justify-center py-16 text-white/30">
-                <Loader2 size={32} className="animate-spin" />
-              </div>
-            )}
-
-            {!loading && promotions.length === 0 && (
-              <div className="rounded-[40px] border border-white/10 bg-white/5 p-14 text-center">
-                <Tag size={48} className="mx-auto mb-4 text-white/20" />
-                <h3 className="text-2xl font-black text-white/60">Belum ada promo</h3>
-                <p className="mt-2 text-sm text-white/30">Tambahkan promo pertama dari form di sebelah kiri.</p>
-              </div>
-            )}
-
-            {!loading && promotions.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {promotions.map((promo) => {
-                  const effectivelyActive = promo.is_active === 1 && !promo.is_expired;
-                  return (
-                    <div
-                      key={promo.id}
-                      className={`rounded-[28px] border p-5 transition ${
-                        effectivelyActive
-                          ? "border-emerald-500/30 bg-emerald-500/[0.06]"
-                          : "border-white/10 bg-white/[0.04] opacity-70"
-                      }`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-2">
-                          {promo.product_image
-                            ? <img src={promo.product_image} alt={promo.product_name} className="max-h-full object-contain" />
-                            : <Package size={24} className="text-neutral-300" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-black">{promo.product_name}</h3>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="text-sm text-white/40 line-through">{rupiah(promo.base_price)}</span>
-                            <span className="text-sm font-bold text-emerald-400">
-                              {rupiah(finalPrice(promo.base_price, promo.discount_percent))}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="my-4 h-px bg-white/10" />
-
-                      <div className="flex items-center justify-between">
-                        <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300">
-                          -{promo.discount_percent}%
-                        </span>
-
-                        {promo.is_expired ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-3 py-1 text-xs font-bold text-red-300">
-                            <Clock size={12} /> Kedaluwarsa
+                    <div>
+                      <p className="text-lg font-black">{promo.product_name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        {expired ? (
+                          <span className="rounded-full bg-neutral-700 px-3 py-0.5 text-xs font-black text-white/40">
+                            EXPIRED
                           </span>
-                        ) : promo.is_active === 1 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-300">
-                            <CheckCircle2 size={12} /> Aktif
+                        ) : active ? (
+                          <span className="rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-black text-emerald-400">
+                            AKTIF
                           </span>
                         ) : (
-                          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white/40">
-                            Nonaktif
+                          <span className="rounded-full bg-yellow-500/15 px-3 py-0.5 text-xs font-black text-yellow-400">
+                            NONAKTIF
                           </span>
                         )}
-                      </div>
 
-                      <p className="mt-2 text-xs text-white/30">
-                        Berlaku sampai: {formatDate(promo.valid_until)}
-                      </p>
+                        <span className="rounded-full bg-red-500/15 px-3 py-0.5 text-xs font-black text-red-400">
+                          {promo.discount_percent}% OFF
+                        </span>
 
-                      <div className="mt-4 flex gap-2">
-                        {!promo.is_expired && (
-                          <button
-                            onClick={() => toggleActive(promo)}
-                            disabled={togglingId === promo.id}
-                            className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition disabled:opacity-50 ${
-                              promo.is_active === 1
-                                ? "bg-white/10 text-white/70 hover:bg-white/20"
-                                : "bg-emerald-600 text-white hover:bg-emerald-700"
-                            }`}
-                          >
-                            {togglingId === promo.id
-                              ? <Loader2 size={14} className="mx-auto animate-spin" />
-                              : promo.is_active === 1 ? "Nonaktifkan" : "Aktifkan"}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setDeleteTarget(promo)}
-                          className="rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-400 transition hover:bg-red-500 hover:text-white"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <span className="text-xs text-white/30">
+                          Hingga:{" "}
+                          <span className="text-white/50">
+                            {formatDate(promo.valid_until)}
+                          </span>
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    {!expired && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(promo)}
+                        title={promo.is_active === 1 ? "Nonaktifkan" : "Aktifkan"}
+                        className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black transition hover:bg-white/10"
+                      >
+                        {promo.is_active === 1 ? (
+                          <ToggleRight size={18} className="text-emerald-400" />
+                        ) : (
+                          <ToggleLeft size={18} className="text-white/30" />
+                        )}
+                        {promo.is_active === 1 ? "Aktif" : "Nonaktif"}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => openEditForm(promo)}
+                      title="Edit promo"
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 transition hover:bg-blue-500/20 hover:text-blue-400"
+                    >
+                      <Pencil size={15} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => askDelete(promo)}
+                      title="Hapus promo"
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/50 transition hover:bg-red-500/20 hover:text-red-400"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
-        </div>
-      </section>
-
-      {deleteTarget && (
-        <DeleteModal
-          promo={deleteTarget}
-          onConfirm={confirmDelete}
-          onCancel={() => setDeleteTarget(null)}
-          loading={deletingId === deleteTarget.id}
-        />
-      )}
-
-      <ToastList toasts={toasts} onDismiss={dismissToast} />
+        )}
+      </div>
     </main>
   );
 }

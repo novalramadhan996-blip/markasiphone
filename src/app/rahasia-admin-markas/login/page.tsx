@@ -32,7 +32,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        localStorage.setItem("admin_logged_in", "true");
+        localStorage.setItem("markas_admin_logged_in", "true");
         router.push("/rahasia-admin-markas/dashboard");
       } else {
         setError(data.message || "Email atau password salah");

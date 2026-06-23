@@ -1,15 +1,53 @@
-import { ArrowUpRight, Gem, ShieldCheck, ShoppingBag } from "lucide-react";
+"use client";
+
+import { ArrowUpRight, Gem, ShieldCheck, ShoppingBag, Tag } from "lucide-react";
 import Link from "next/link";
 import { Product } from "../store/ProductStore";
 
+function formatRupiah(value: number) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function parseRupiah(price: string) {
+  return Number(price.replace(/[^0-9]/g, ""));
+}
+
 export default function ProductCard({ product }: { product: Product }) {
+  const hasPromo =
+    product.discount_percent != null &&
+    product.discount_percent > 0 &&
+    product.discounted_price != null;
+
+  const displayPrice = hasPromo
+    ? formatRupiah(product.discounted_price!)
+    : product.price;
+
+  const originalPrice = product.price;
+
+  // Harga yang dikirim ke checkout — pakai harga diskon kalau ada promo
+  const checkoutPrice = hasPromo
+    ? formatRupiah(product.discounted_price!)
+    : product.price;
+
   return (
     <div className="group block overflow-hidden rounded-[42px] border border-black/5 bg-white p-4 shadow-[0_20px_80px_rgba(0,0,0,0.08)] transition-all duration-500 hover:-translate-y-3 hover:shadow-[0_35px_110px_rgba(37,99,235,0.22)]">
       <Link href={`/produk/${product.id}`}>
         <div className="relative mb-5 flex h-72 items-center justify-center overflow-hidden rounded-[34px] bg-gradient-to-br from-[#f8fbff] via-[#f5f5f7] to-[#eaf1ff] p-7">
-          <div className="absolute left-5 top-5 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 backdrop-blur-xl">
-            New
-          </div>
+          {/* Badge NEW atau DISKON */}
+          {hasPromo ? (
+            <div className="absolute left-5 top-5 flex items-center gap-1 rounded-full border border-red-200 bg-red-500 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white shadow-md">
+              <Tag size={10} />
+              DISKON {product.discount_percent}%
+            </div>
+          ) : (
+            <div className="absolute left-5 top-5 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-blue-600 backdrop-blur-xl">
+              New
+            </div>
+          )}
 
           <div className="absolute h-44 w-44 rounded-full bg-blue-300/30 blur-3xl transition duration-500 group-hover:scale-150" />
 
@@ -55,11 +93,20 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className="flex items-center justify-between border-t border-black/5 pt-5">
           <div>
             <p className="text-xs font-bold text-neutral-400">Mulai dari</p>
-            <p className="text-xl font-black text-black">{product.price}</p>
+            {hasPromo ? (
+              <div>
+                <p className="text-sm font-bold text-neutral-400 line-through">
+                  {originalPrice}
+                </p>
+                <p className="text-xl font-black text-red-500">{displayPrice}</p>
+              </div>
+            ) : (
+              <p className="text-xl font-black text-black">{displayPrice}</p>
+            )}
           </div>
 
           <Link
-            href={`/checkout?produk=${encodeURIComponent(product.name)}&harga=${encodeURIComponent(product.price)}`}
+            href={`/checkout?produk=${encodeURIComponent(product.name)}&harga=${encodeURIComponent(checkoutPrice)}`}
             className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-xs font-black text-white transition hover:bg-black"
           >
             <ShoppingBag size={15} />

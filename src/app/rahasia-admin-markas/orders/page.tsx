@@ -235,7 +235,7 @@ export default function OrdersPage() {
 
   // ── Auth check ──
   useEffect(() => {
-    if (localStorage.getItem("admin_logged_in") !== "true") {
+    if (localStorage.getItem("markas_admin_logged_in") !== "true") {
       router.push("/rahasia-admin-markas/login");
       return;
     }

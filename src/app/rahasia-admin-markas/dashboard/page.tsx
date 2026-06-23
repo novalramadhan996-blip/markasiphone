@@ -16,6 +16,9 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
+  Tag,
+  MessageSquare,
+  ShoppingCart,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,29 +29,25 @@ interface DashboardStats {
   pending_orders: number;
   completed_orders: number;
   total_revenue: number;
+  activePromos: number;
 }
 
 function formatRupiah(angka: number) {
-  if (angka >= 1_000_000_000) {
-    return `Rp ${(angka / 1_000_000_000).toFixed(1)}M`;
-  }
-  if (angka >= 1_000_000) {
-    return `Rp ${(angka / 1_000_000).toFixed(1)}Jt`;
-  }
+  if (angka >= 1_000_000_000) return `Rp ${(angka / 1_000_000_000).toFixed(1)}M`;
+  if (angka >= 1_000_000)     return `Rp ${(angka / 1_000_000).toFixed(1)}Jt`;
   return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
+    style: "currency", currency: "IDR", minimumFractionDigits: 0,
   }).format(angka);
 }
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(true);
+  const [stats, setStats]                   = useState<DashboardStats | null>(null);
+  const [loadingStats, setLoadingStats]     = useState(true);
+  const [testimoniPending, setTestimoniPending] = useState<number>(0);
 
   useEffect(() => {
-    const isLogin = localStorage.getItem("admin_logged_in");
+    const isLogin = localStorage.getItem("markas_admin_logged_in");
     if (isLogin !== "true") {
       router.push("/rahasia-admin-markas/login");
       return;
@@ -69,10 +68,18 @@ export default function DashboardPage() {
     } finally {
       setLoadingStats(false);
     }
+
+    try {
+      const resT  = await fetch('/api/testimonials?status=pending');
+      const dataT = await resT.json();
+      setTestimoniPending((dataT.data ?? []).length);
+    } catch {
+      // silent — tidak kritis
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem("admin_logged_in");
+    localStorage.removeItem("markas_admin_logged_in");
     router.push("/rahasia-admin-markas/login");
   };
 
@@ -98,11 +105,7 @@ export default function DashboardPage() {
     {
       icon: <TrendingUp className="text-purple-300" />,
       label: "Total Omset",
-      value: loadingStats
-        ? null
-        : stats
-        ? formatRupiah(stats.total_revenue)
-        : "Rp 0",
+      value: loadingStats ? null : stats ? formatRupiah(stats.total_revenue) : "Rp 0",
       isRupiah: true,
     },
   ];
@@ -145,7 +148,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Cards — data real dari API */}
+        {/* Stats Cards */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((card, i) => (
             <div
@@ -160,16 +163,10 @@ export default function DashboardPage() {
                   <span className="text-sm">Loading...</span>
                 </div>
               ) : (
-                <h2
-                  className={`mt-1 font-black ${
-                    card.isRupiah ? "text-2xl" : "text-4xl"
-                  }`}
-                >
+                <h2 className={`mt-1 font-black ${card.isRupiah ? "text-2xl" : "text-4xl"}`}>
                   {card.value}
                   {!card.isRupiah && (
-                    <span className="ml-1 text-base font-normal text-white/40">
-                      {card.suffix}
-                    </span>
+                    <span className="ml-1 text-base font-normal text-white/40">{card.suffix}</span>
                   )}
                 </h2>
               )}
@@ -220,15 +217,59 @@ export default function DashboardPage() {
             href="/rahasia-admin-markas/orders"
             className="group rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:-translate-y-2 hover:bg-white/15"
           >
-            <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-500/20 text-cyan-300">
-              <ShoppingBag size={34} />
+            <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-yellow-500/20 text-yellow-300">
+              <ShoppingCart size={34} />
             </div>
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-4xl font-black tracking-[-0.05em]">Pesanan</h2>
               <ArrowUpRight className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
             </div>
             <p className="text-lg leading-8 text-white/50">
-              Lihat pesanan masuk, update status, dan kirim notifikasi ke customer.
+              Pantau dan update status pesanan masuk dari pelanggan.
+            </p>
+          </Link>
+
+          {/* Promosi — FIX: icon + null-safe stats?.activePromos */}
+          <Link
+            href="/rahasia-admin-markas/promosi"
+            className="group rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:-translate-y-2 hover:bg-white/15"
+          >
+            <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-purple-500/20 text-purple-300">
+              <Tag size={34} />  {/* ← FIX: icon dari lucide, tidak kosong lagi */}
+            </div>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-4xl font-black tracking-[-0.05em]">Promosi</h2>
+              <ArrowUpRight className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </div>
+            <p className="text-lg leading-8 text-white/50">
+              Atur diskon dan promo produk.{" "}
+              <span className="font-bold text-purple-300">
+                {stats?.activePromos ?? 0} promo aktif {/* ← FIX: null-safe */}
+              </span>
+            </p>
+          </Link>
+
+          {/* Testimoni — FIX: konsisten dengan tema dark glass */}
+          <Link
+            href="/rahasia-admin-markas/testimoni"
+            className="group rounded-[40px] border border-white/10 bg-white/10 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:-translate-y-2 hover:bg-white/15"
+          >
+            <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-500/20 text-blue-300">
+              <MessageSquare size={34} />
+            </div>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-4xl font-black tracking-[-0.05em]">Testimoni</h2>
+              <div className="flex items-center gap-2">
+                {testimoniPending > 0 && (
+                  <span className="rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white">
+                    {testimoniPending} baru
+                  </span>
+                )}
+                <ArrowUpRight className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
+              </div>
+            </div>
+            <p className="text-lg leading-8 text-white/50">
+              Approve atau tolak ulasan pelanggan sebelum tampil di website.
             </p>
           </Link>
 
@@ -289,9 +330,7 @@ export default function DashboardPage() {
               <Globe size={34} />
             </div>
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-4xl font-black tracking-[-0.05em] text-white/60">
-                Toko
-              </h2>
+              <h2 className="text-4xl font-black tracking-[-0.05em] text-white/60">Toko</h2>
               <ArrowUpRight className="text-white/40 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
             </div>
             <p className="text-lg leading-8 text-white/30">

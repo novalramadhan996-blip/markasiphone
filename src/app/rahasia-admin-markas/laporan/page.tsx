@@ -100,7 +100,7 @@ export default function LaporanPage() {
 
   // ── Auth check ──
   useEffect(() => {
-    if (localStorage.getItem("admin_logged_in") !== "true") {
+    if (localStorage.getItem("admin__in") !== "true") {
       router.push("/rahasia-admin-markas/login");
       return;
     }

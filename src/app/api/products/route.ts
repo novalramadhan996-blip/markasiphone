@@ -68,7 +68,7 @@ export async function GET() {
     `);
 
     const enriched = (rows as ProductRow[]).map(enrichWithPromo);
-    return Response.json(enriched);
+    return Response.json({ products: enriched });
   } catch (error) {
     return Response.json(
       { message: "Gagal mengambil produk", error: String(error) },
