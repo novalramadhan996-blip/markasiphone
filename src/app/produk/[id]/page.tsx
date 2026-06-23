@@ -2,13 +2,14 @@
 
 import { motion } from "framer-motion";
 import {
-    ArrowLeft,
-    Gem,
-    MessageCircle,
-    Plus,
-    ShieldCheck,
-    ShoppingBag,
-    Truck,
+  ArrowLeft,
+  Gem,
+  MessageCircle,
+  Plus,
+  ShieldCheck,
+  ShoppingBag,
+  Tag,
+  Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -64,8 +65,26 @@ export default function ProductDetailPage() {
     );
   }
 
-  const basePrice = parseRupiah(product.price);
+  const hasPromo =
+    product.discount_percent != null &&
+    product.discount_percent > 0 &&
+    product.discounted_price != null;
+
+  // Harga dasar: kalau ada promo, pakai discounted_price; kalau tidak, parse dari string "Rp X"
+  const basePrice = hasPromo
+    ? product.discounted_price!
+    : parseRupiah(product.price);
+
+  const originalBasePrice = parseRupiah(product.price);
+
+  // Harga final = harga dasar (sudah diskon) + tambahan storage
   const finalPrice = formatRupiah(basePrice + selectedStorage.add);
+
+  // Harga asli untuk ditampilkan coret (hanya ada kalau ada promo)
+  const originalFinalPrice = hasPromo
+    ? formatRupiah(originalBasePrice + selectedStorage.add)
+    : null;
+
   const productWithStorage = `${product.name} ${selectedStorage.label}`;
 
   return (
@@ -81,6 +100,14 @@ export default function ProductDetailPage() {
           transition={{ duration: 0.7 }}
           className="flex min-h-[620px] items-center justify-center rounded-[50px] border border-white/10 bg-white/10 p-10 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
         >
+          {/* Badge diskon di atas gambar */}
+          {hasPromo && (
+            <div className="absolute left-8 top-8 z-20 flex items-center gap-1.5 rounded-full bg-red-500 px-4 py-2 text-sm font-black text-white shadow-lg">
+              <Tag size={14} />
+              DISKON {product.discount_percent}%
+            </div>
+          )}
+
           <motion.img
             animate={{ y: [0, -18, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -117,13 +144,31 @@ export default function ProductDetailPage() {
             {product.desc}
           </p>
 
+          {/* Harga dengan promo */}
           <div className="mb-8 rounded-[34px] border border-white/10 bg-white/10 p-7 backdrop-blur-2xl">
             <p className="mb-2 text-sm font-bold text-white/40">
               Harga untuk {selectedStorage.label}
             </p>
-            <h2 className="text-5xl font-black tracking-[-0.06em]">
-              {finalPrice}
-            </h2>
+
+            {hasPromo ? (
+              <div className="flex flex-col gap-1">
+                {/* Banner promo kecil */}
+                <div className="mb-3 inline-flex w-fit items-center gap-2 rounded-full bg-red-500/20 px-4 py-1.5 text-xs font-black text-red-400">
+                  <Tag size={12} />
+                  HEMAT {product.discount_percent}% — Promo aktif!
+                </div>
+                <p className="text-2xl font-bold text-white/40 line-through">
+                  {originalFinalPrice}
+                </p>
+                <h2 className="text-5xl font-black tracking-[-0.06em] text-red-400">
+                  {finalPrice}
+                </h2>
+              </div>
+            ) : (
+              <h2 className="text-5xl font-black tracking-[-0.06em]">
+                {finalPrice}
+              </h2>
+            )}
           </div>
 
           <div className="mb-8 grid grid-cols-3 gap-3">
