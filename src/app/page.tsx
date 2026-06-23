@@ -33,19 +33,14 @@ export default function Home() {
     fetch("/api/products")
       .then((res) => res.json())
       .then((data) => {
-        // Handle error response
         if (data.error || data.message) {
           console.error("API Error:", data.message);
           setProducts([]);
           return;
         }
-        // Set products jika array
-        if (Array.isArray(data)) {
-          setProducts(data);
-        } else {
-          console.error("Invalid data format:", data);
-          setProducts([]);
-        }
+        // Handle both { products: [...] } and direct array
+        const list = Array.isArray(data) ? data : (data.products ?? []);
+        setProducts(list);
       })
       .catch((error) => {
         console.error("Gagal ambil produk:", error);
