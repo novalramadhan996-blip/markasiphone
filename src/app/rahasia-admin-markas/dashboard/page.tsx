@@ -35,6 +35,7 @@ import {
   Tag,
   Globe,
   ImageIcon,
+  BarChart3
 } from "lucide-react";
 import ExcelJs from "exceljs";
 
@@ -587,12 +588,12 @@ export default function AdminDashboardPage() {
           {[
             { href: "/rahasia-admin-markas/orders", label: "Orders", Icon: ShoppingBag, color: "from-blue-500/20 to-blue-600/10 border-blue-500/20" },
             { href: "/rahasia-admin-markas/produk", label: "Produk", Icon: Package, color: "from-violet-500/20 to-violet-600/10 border-violet-500/20" },
-            { href: "/rahasia-admin-markas/promosi", label: "Promosi", Icon: Tag, color: "from-rose-500/20 to-rose-600/10 border-rose-500/20" }, // Warna Baru: Rose
+            { href: "/rahasia-admin-markas/promosi", label: "Promosi", Icon: Tag, color: "from-rose-500/20 to-rose-600/10 border-rose-500/20" },
             { href: "/rahasia-admin-markas/keuangan", label: "Keuangan", Icon: Wallet, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/20" },
-            { href: "/rahasia-admin-markas/laporan", label: "Laporan", Icon: Wallet, color: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/20" },
+            { href: "/rahasia-admin-markas/laporan", label: "Laporan", Icon: BarChart3, color: "from-orange-500/20 to-orange-600/10 border-orange-500/20" },
             { href: "/rahasia-admin-markas/testimoni", label: "Testimoni", Icon: Star, color: "from-amber-500/20 to-amber-600/10 border-amber-500/20" },
-            { href: "", label: "Banner", Icon: ImageIcon, color: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/20" }, // Warna Baru: Cyan
-            { href: "/", label: "Toko", Icon: Globe, color: "from-fuchsia-500/20 to-fuchsia-600/10 border-fuchsia-500/20" }, // Warna Baru: Fuchsia
+            { href: "", label: "Banner", Icon: ImageIcon, color: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/20" },
+            { href: "/", label: "Toko", Icon: Globe, color: "from-fuchsia-500/20 to-fuchsia-600/10 border-fuchsia-500/20" },
           ].map(({ href, label, Icon, color }) => (
             <Link
               key={href}
