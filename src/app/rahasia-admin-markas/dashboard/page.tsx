@@ -37,7 +37,8 @@ import {
   ImageIcon,
   BarChart3
 } from "lucide-react";
-import ExcelJs from "exceljs";
+import { usePendingOrders } from "@/hooks/usePendingOrders";
+import { BadgeCount } from "@/components/BadgeCount";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DashboardStats = {
@@ -169,19 +170,27 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const { pendingCount } = usePendingOrders();
+
   // Auth check
   useEffect(() => {
     const isLogged = localStorage.getItem("markas_admin_logged_in");
     if (!isLogged) window.location.href = "/rahasia-admin-markas/login";
   }, []);
 
+  
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, ordersRes, keuanganRes] = await Promise.all([
         fetch("/api/dashboard"),
-        fetch("/api/orders"),
-        fetch("/api/keuangan"),
+        fetch("/api/orders", {
+          headers: {"x-admin-request": "true"}
+        }),
+        fetch("/api/keuangan", {
+          headers: {"x-admin-request": "true"}
+        }),
       ]);
       const [statsData, ordersData, keuanganData] = await Promise.all([
         statsRes.json(),
@@ -327,7 +336,7 @@ export default function AdminDashboardPage() {
           <StatCard
             label="Total Order"
             value={String(orders.length)}
-            sub={`${stats?.pending_orders ?? 0} pending`}
+            sub={`${pendingCount} pending`}
             Icon={ShoppingBag}
             accent="bg-gradient-to-br from-violet-500 to-violet-700"
           />

@@ -81,6 +81,7 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
   const laba           = totalIncome - totalExpense;
   const activePromo    = (promoCount as any[])[0]?.cnt ?? 0;
   const approvedTesti  = (testiCount as any[])[0]?.cnt ?? 0;
+  
 
   // ── Title banner ──
   ws.mergeCells("A1:F1");
@@ -323,12 +324,14 @@ async function buildOrders(wb: ExcelJS.Workbook) {
     });
   });
 
+  const lastDataRow = ws.rowCount;
+
   // Total row
   const totalRow = ws.addRow(["", "", "", "", "", "TOTAL", `=SUM(G4:G${ws.rowCount})`, "", ""]);
   totalRow.height = 26;
   totalRow.getCell(6).style = headerStyle(wb, "FF334155");
   totalRow.getCell(7).numFmt = '"Rp "#,##0';
-  totalRow.getCell(7).style = headerStyle(wb, ACCENT);
+  totalRow.getCell(7).value = { formula: `SUM(G4:G${lastDataRow})` };
 
   ws.columns = [
     { width: 5  },
@@ -360,6 +363,8 @@ async function buildKeuangan(wb: ExcelJS.Workbook) {
 
   const incomes  = (keuangan as any[]).filter((k: any) => k.type === "income");
   const expenses = (keuangan as any[]).filter((k: any) => k.type === "expense");
+
+  
 
   ws.mergeCells("A1:E1");
   const t = ws.getCell("A1");
@@ -397,6 +402,7 @@ async function buildKeuangan(wb: ExcelJS.Workbook) {
   labaRow.getCell(1).style = headerStyle(wb, ACCENT);
   labaRow.getCell(2).style = headerStyle(wb, ACCENT);
   labaRow.getCell(2).numFmt = '"Rp "#,##0';
+  labaRow.getCell(2).value = { formula: "B5-B6" };
 
   ws.addRow([]);
   ws.getRow(ws.rowCount).height = 10;
@@ -423,11 +429,16 @@ async function buildKeuangan(wb: ExcelJS.Workbook) {
     r.getCell(4).numFmt = "DD/MM/YYYY";
   });
 
+  const incFirstDataRow = ws.rowCount - incomes.length + 1;
+  const incLastDataRow = ws.rowCount;
+
   const incTotalRow = ws.addRow(["", "TOTAL PEMASUKAN", `=SUM(C${ws.rowCount - incomes.length + 1}:C${ws.rowCount})`, "", ""]);
   incTotalRow.height = 24;
   incTotalRow.getCell(2).style = headerStyle(wb, "FF166534");
   incTotalRow.getCell(3).style = headerStyle(wb, "FF16A34A");
   incTotalRow.getCell(3).numFmt = '"Rp "#,##0';
+  incTotalRow.getCell(3).value = { formula: `SUM(C${incFirstDataRow}:C${incLastDataRow})` };
+
 
   ws.addRow([]);
   ws.getRow(ws.rowCount).height = 10;
@@ -454,11 +465,15 @@ async function buildKeuangan(wb: ExcelJS.Workbook) {
     r.getCell(4).numFmt = "DD/MM/YYYY";
   });
 
+  const expFirstDataRow = ws.rowCount - expenses.length + 1;
+  const expLastDataRow = ws.rowCount;
+
   const expTotalRow = ws.addRow(["", "TOTAL PENGELUARAN", `=SUM(C${ws.rowCount - expenses.length + 1}:C${ws.rowCount})`, "", ""]);
   expTotalRow.height = 24;
   expTotalRow.getCell(2).style = headerStyle(wb, "FF991B1B");
   expTotalRow.getCell(3).style = headerStyle(wb, "FFDC2626");
   expTotalRow.getCell(3).numFmt = '"Rp "#,##0';
+  expTotalRow.getCell(3).value = { formula: `SUM(C${expFirstDataRow}:C${expLastDataRow})` };
 
   ws.columns = [
     { width: 5  },
@@ -533,11 +548,14 @@ async function buildProduk(wb: ExcelJS.Workbook) {
   });
 
   // Summary baris bawah
+  const lastDataRow = ws.rowCount;
+
   const sumRow = ws.addRow(["", "", `TOTAL: ${(products as any[]).length} produk`, "", "", "", `=SUM(G4:G${ws.rowCount})`, ""]);
   sumRow.height = 26;
   sumRow.getCell(3).style = headerStyle(wb, "FF4C1D95");
   sumRow.getCell(7).style = headerStyle(wb, "FF7C3AED");
   sumRow.getCell(7).numFmt = "#,##0";
+  sumRow.getCell(7).value = { formula: `SUM(G4:G${lastDataRow})` };
 
   ws.columns = [
     { width: 5  },

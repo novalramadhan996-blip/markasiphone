@@ -110,7 +110,9 @@ export default function CheckoutPage() {
 
       const res = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+         },
         body: JSON.stringify({
           customer_name: form.customer_name,
           customer_email: form.customer_email,

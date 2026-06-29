@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { db } from "../../../lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 // Helper buat transporter email
 function createTransporter() {
@@ -14,21 +15,54 @@ function createTransporter() {
 }
 
 // GET semua orders
-export async function GET() {
-  try {
-    const [rows] = await db.query(`
-      SELECT *
-      FROM orders
-      ORDER BY created_at DESC
-    `);
-
-    return Response.json(rows);
-  } catch (error) {
-    return Response.json(
-      { message: "Gagal mengambil orders", error: String(error) },
-      { status: 500 }
-    );
+// GET handler — tambah query params page & limit
+export async function GET(req: NextRequest) {
+  const isAdmin = req.headers.get("x-admin-request") === "true";
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(req.url);
+  const page  = Math.max(1, parseInt(searchParams.get("page")  || "1"));
+  const limit = Math.min(100, parseInt(searchParams.get("limit") || "20"));
+  const status = searchParams.get("status") || "";
+  const search = searchParams.get("search") || "";
+  const offset = (page - 1) * limit;
+
+  // Build WHERE
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+  if (search) {
+    conditions.push("(customer_name LIKE ? OR customer_email LIKE ? OR phone LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const [[{ total }]] = await db.query<any[]>(
+    `SELECT COUNT(*) AS total FROM orders ${where}`,
+    params
+  );
+
+  const [rows] = await db.query<any[]>(
+    `SELECT * FROM orders ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  return NextResponse.json({
+    data: rows,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
 }
 
 // POST buat order baru
@@ -124,6 +158,11 @@ export async function POST(request: Request) {
 
 // PATCH update status order
 export async function PATCH(request: Request) {
+  const req = request as NextRequest;
+  if (req.headers.get("x-admin-request") !== "true") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, status } = body;
@@ -193,6 +232,11 @@ export async function PATCH(request: Request) {
 
 // DELETE hapus order
 export async function DELETE(request: Request) {
+  const req = request as NextRequest;
+  if (req.headers.get("x-admin-request") !== "true") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

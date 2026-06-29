@@ -4,18 +4,22 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   CreditCard,
+  Search,
   ShieldCheck,
   Sparkles,
   Star,
   Truck,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Navbar from "../components/Navbar";
 import ProductCard from "../components/ProductCard";
 import ChatWidget from "../components/ChatWidget";
+import { BannerCarousel } from "@/components/BannerCarousel";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type DbProduct = {
   id: number;
   name: string;
@@ -35,10 +39,16 @@ type Testimoni = {
   photo_url: string | null;
 };
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [products, setProducts] = useState<DbProduct[]>([]);
   const [testimonials, setTestimonials] = useState<Testimoni[]>([]);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("Semua");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Fetch products ──────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/products")
       .then((res) => res.json())
@@ -57,22 +67,64 @@ export default function Home() {
       });
   }, []);
 
-  // Fetch 3 approved testimoni untuk preview di homepage
+  // ── Fetch testimonials ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/testimonials?status=approved")
       .then((res) => res.json())
       .then((data) => {
-        const list: Testimoni[] = Array.isArray(data) ? data : (data.testimonials ?? []);
+        const list: Testimoni[] = Array.isArray(data)
+          ? data
+          : (data.testimonials ?? []);
         setTestimonials(list.slice(0, 3));
       })
       .catch(() => setTestimonials([]));
   }, []);
 
+  // ── Debounce search input ───────────────────────────────────────────────────
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+    }, 300);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // ── Derive categories from products ────────────────────────────────────────
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(products.map((p) => p.category))).filter(Boolean);
+    return ["Semua", ...cats.sort()];
+  }, [products]);
+
+  // ── Filter products ────────────────────────────────────────────────────────
+  const filteredProducts = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return products.filter((p) => {
+      const matchCategory =
+        activeCategory === "Semua" || p.category === activeCategory;
+      const matchSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q);
+      return matchCategory && matchSearch;
+    });
+  }, [products, search, activeCategory]);
+
+  const hasActiveFilter = searchInput !== "" || activeCategory !== "Semua";
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <main className="min-h-screen overflow-hidden bg-black text-white">
       <Navbar />
 
-      {/* ── Hero ───────────────────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative min-h-screen overflow-hidden bg-black">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#2563eb55_0%,transparent_32%),radial-gradient(circle_at_80%_10%,#9333ea55_0%,transparent_28%),radial-gradient(circle_at_50%_90%,#06b6d455_0%,transparent_32%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,black_85%)]" />
@@ -129,7 +181,6 @@ export default function Home() {
           >
             <div className="absolute h-[460px] w-[460px] rounded-full bg-blue-500/30 blur-3xl" />
             <div className="absolute bottom-0 h-32 w-96 rounded-full bg-white/20 blur-3xl" />
-
             <img
               src="https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-model-unselect-gallery-2-202309?wid=1400&hei=1400&fmt=png-alpha&.v=1693010533312"
               alt="iPhone 15 Pro"
@@ -137,9 +188,10 @@ export default function Home() {
             />
           </motion.div>
         </motion.div>
+        <BannerCarousel />
       </section>
 
-      {/* ── Feature Badges ─────────────────────────────────────────────────── */}
+      {/* ── Feature Badges ───────────────────────────────────────────────── */}
       <section className="relative z-10 -mt-24 px-6 pb-20">
         <div className="mx-auto grid max-w-7xl gap-5 rounded-[40px] border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur-2xl md:grid-cols-3">
           <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
@@ -147,13 +199,11 @@ export default function Home() {
             <h3 className="mb-2 text-2xl font-black">Gratis Ongkir</h3>
             <p className="text-white/55">Untuk area tertentu.</p>
           </div>
-
           <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
             <ShieldCheck className="mb-5 text-blue-300" size={30} />
             <h3 className="mb-2 text-2xl font-black">Garansi Resmi</h3>
             <p className="text-white/55">Produk original dan bergaransi.</p>
           </div>
-
           <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
             <CreditCard className="mb-5 text-blue-300" size={30} />
             <h3 className="mb-2 text-2xl font-black">Cicilan Mudah</h3>
@@ -162,62 +212,141 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Products ───────────────────────────────────────────────────────── */}
+      {/* ── Products ─────────────────────────────────────────────────────── */}
       <section id="produk" className="bg-[#f5f5f7] px-6 py-24 text-black">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-14 text-center">
+          {/* Section header */}
+          <div className="mb-10 text-center">
             <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-blue-600">
               Product Collection
             </p>
-
             <h2 className="text-6xl font-black tracking-[-0.07em] md:text-8xl">
               Pilihan Premium.
             </h2>
-
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-neutral-500">
               Pilih produk Apple favorit kamu dari database Markas iPhone.
             </p>
           </div>
 
+          {/* ── Search + Filter ── */}
+          <div className="mb-8 flex flex-col gap-4">
+            {/* Search bar */}
+            <div className="relative mx-auto w-full max-w-xl">
+              <Search
+                size={18}
+                className="absolute left-5 top-1/2 -translate-y-1/2 text-neutral-400"
+              />
+              <input
+                type="text"
+                placeholder="Cari produk…"
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full rounded-2xl border border-black/10 bg-white py-4 pl-12 pr-11 font-bold text-black placeholder:text-neutral-400 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+              />
+              {searchInput && (
+                <button
+                  onClick={() => handleSearchChange("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-lg p-1 text-neutral-400 transition hover:text-black"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            {/* Category filter chips */}
+            {categories.length > 1 && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`rounded-full border px-5 py-2 text-sm font-bold transition-all ${
+                      activeCategory === cat
+                        ? "border-blue-500 bg-blue-600 text-white shadow-md"
+                        : "border-black/10 bg-white text-neutral-600 hover:border-blue-300 hover:text-blue-600"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Product grid */}
           {products.length === 0 ? (
             <div className="rounded-[36px] bg-white p-10 text-center shadow-sm">
               <p className="text-lg font-bold text-neutral-500">
                 Belum ada produk dari database.
               </p>
             </div>
-          ) : (
-            <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-4">
-              {products.map((product, index) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 35 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.08 }}
-                  viewport={{ once: true }}
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-[36px] bg-white p-14 text-center shadow-sm">
+              <Search size={40} className="mx-auto mb-4 text-neutral-300" />
+              <p className="text-xl font-black text-neutral-500">
+                Produk tidak ditemukan
+              </p>
+              <p className="mt-2 text-neutral-400">
+                Tidak ada produk yang cocok dengan{" "}
+                {searchInput ? `"${searchInput}"` : ""}
+                {searchInput && activeCategory !== "Semua" ? " di " : ""}
+                {activeCategory !== "Semua" ? `kategori "${activeCategory}"` : ""}
+                .
+              </p>
+              {hasActiveFilter && (
+                <button
+                  onClick={() => {
+                    handleSearchChange("");
+                    setActiveCategory("Semua");
+                  }}
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-black/10 bg-neutral-100 px-6 py-3 text-sm font-bold text-neutral-600 transition hover:bg-neutral-200"
                 >
-                  <ProductCard
-                    product={{
-                      id: product.slug,
-                      name: product.name,
-                      category: product.category,
-                      image: product.image_url,
-                      price: `Rp ${Number(product.base_price).toLocaleString(
-                        "id-ID"
-                      )}`,
-                      desc: product.description,
-                    }}
-                  />
-                </motion.div>
-              ))}
+                  <X size={15} />
+                  Hapus filter
+                </button>
+              )}
             </div>
+          ) : (
+            <>
+              {hasActiveFilter && (
+                <p className="mb-5 text-sm font-bold text-neutral-500">
+                  {filteredProducts.length} produk ditemukan
+                  {searchInput ? ` untuk "${searchInput}"` : ""}
+                  {activeCategory !== "Semua"
+                    ? ` dalam kategori "${activeCategory}"`
+                    : ""}
+                </p>
+              )}
+              <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-4">
+                {filteredProducts.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    initial={{ opacity: 0, y: 35 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: Math.min(index * 0.08, 0.4) }}
+                    viewport={{ once: true }}
+                  >
+                    <ProductCard
+                      product={{
+                        id: product.slug,
+                        name: product.name,
+                        category: product.category,
+                        image: product.image_url,
+                        price: `Rp ${Number(product.base_price).toLocaleString("id-ID")}`,
+                        desc: product.description,
+                      }}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </section>
 
-      {/* ── Testimonials Preview ───────────────────────────────────────────── */}
+      {/* ── Testimonials Preview ─────────────────────────────────────────── */}
       <section id="testimoni" className="bg-black px-6 py-24 text-white">
         <div className="mx-auto max-w-7xl">
-          {/* Section header */}
           <div className="mb-14 text-center">
             <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-blue-400">
               Kata Mereka
@@ -233,7 +362,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Testimoni preview cards */}
           {testimonials.length > 0 ? (
             <div className="mb-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {testimonials.map((t, i) => (
@@ -245,7 +373,6 @@ export default function Home() {
                   viewport={{ once: true }}
                   className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
                 >
-                  {/* Stars */}
                   <div className="mb-4 flex gap-0.5">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
@@ -259,12 +386,12 @@ export default function Home() {
                       />
                     ))}
                   </div>
-                  {/* Message */}
                   <p className="mb-5 text-sm leading-relaxed text-white/65">
                     &ldquo;{t.message}&rdquo;
                   </p>
-                  {/* Name */}
-                  <p className="text-sm font-bold text-white/80">— {t.customer_name}</p>
+                  <p className="text-sm font-bold text-white/80">
+                    — {t.customer_name}
+                  </p>
                 </motion.div>
               ))}
             </div>
@@ -275,7 +402,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* CTA button */}
           <div className="text-center">
             <Link
               href="/testimoni"
@@ -292,7 +418,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Experience Section ─────────────────────────────────────────────── */}
+      {/* ── Experience Section ───────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-black px-6 py-28 text-white">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#2563eb55_0%,transparent_35%),radial-gradient(circle_at_80%_60%,#9333ea55_0%,transparent_35%)]" />
 
@@ -301,13 +427,11 @@ export default function Home() {
             <p className="mb-4 text-sm font-black uppercase tracking-[0.35em] text-blue-300">
               Markas Experience
             </p>
-
             <h2 className="mb-6 text-6xl font-black leading-none tracking-[-0.07em] md:text-8xl">
               Bukan cuma toko.
               <br />
               Ini experience.
             </h2>
-
             <p className="max-w-xl text-lg leading-8 text-white/55">
               UI premium, animasi halus, katalog rapi, checkout manual transfer,
               dan database MySQL lokal dari XAMPP.
