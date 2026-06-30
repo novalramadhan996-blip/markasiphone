@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import {
   Download, FileSpreadsheet, TrendingUp, TrendingDown,
-  Package, ShoppingCart, DollarSign, AlertCircle, RefreshCw,
+  Package, ShoppingCart, DollarSign, AlertCircle, RefreshCw, X,
 } from "lucide-react";
 import ExcelJs from "exceljs";
 
@@ -76,6 +76,8 @@ export default function LaporanPage() {
   const [loading, setLoading]     = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -108,17 +110,23 @@ export default function LaporanPage() {
     setExporting(true);
     setExportMsg("⏳ Menyiapkan laporan...");
     try {
-      const res = await fetch("/api/laporan/export?admin=true", {
+      const params = new URLSearchParams({ admin: "true" });
+      if (startDate && endDate) {
+        params.set("startDate", startDate);
+        params.set("endDate", endDate);
+      }
+
+      const res = await fetch(`/api/laporan/export?${params.toString()}`, {
         headers: { "x-admin-request": "true" },
       });
       if (!res.ok) throw new Error("Gagal export");
 
-      const blob    = await res.blob();
-      const url     = URL.createObjectURL(blob);
-      const link    = document.createElement("a");
-      const now     = new Date().toISOString().slice(0, 10);
+      const blob   = await res.blob();
+      const url    = URL.createObjectURL(blob);
+      const link   = document.createElement("a");
+      const suffix = startDate && endDate ? `${startDate}_${endDate}` : new Date().toISOString().slice(0, 10);
       link.href     = url;
-      link.download = `Laporan_MarkasiPhone_${now}.xlsx`;
+      link.download = `Laporan_MarkasiPhone_${suffix}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
       setExportMsg("✅ Berhasil diunduh!");
@@ -157,6 +165,31 @@ export default function LaporanPage() {
             <p className="text-white/40 text-sm mt-1">
               Data real-time dari database · {new Date().toLocaleDateString("id-ID", { weekday:"long", year:"numeric", month:"long", day:"numeric" })}
             </p>
+          </div>
+
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-[12px] px-4 py-2.5">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-transparent text-white text-sm outline-none [color-scheme:dark]"
+            />
+            <span className="text-white/30 text-xs">s/d</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-transparent text-white text-sm outline-none [color-scheme:dark]"
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(""); setEndDate(""); }}
+                className="text-white/40 hover:text-white/70 transition-colors"
+                title="Reset filter tanggal"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

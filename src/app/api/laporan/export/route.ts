@@ -56,15 +56,25 @@ function formatRupiah(num: number) {
   return `Rp ${num.toLocaleString("id-ID")}`;
 }
 
+function buildDateFilter(startDate?: string | null, endDate?: string | null) {
+  if (!startDate || !endDate) return { clause: "", params: [] as string[] };
+  return {
+    clause: "WHERE created_at BETWEEN ? AND DATE_ADD(?, INTERVAL 1 DAY)",
+    params: [startDate, endDate],
+  };
+}
+
 // ─── Sheet 1: Ringkasan ───────────────────────────────────────────────────────
-async function buildRingkasan(wb: ExcelJS.Workbook) {
+async function buildRingkasan(wb: ExcelJS.Workbook, startDate?: string | null, endDate?: string | null) {
   const ws = wb.addWorksheet("📊 Ringkasan");
   ws.properties.defaultRowHeight = 22;
 
+  const { clause, params } = buildDateFilter(startDate, endDate);
+
   // Ambil data dari DB
-  const [ordersAll]  = await db.query<any[]>("SELECT * FROM orders ORDER BY created_at DESC");
+  const [ordersAll]  = await db.query<any[]>(`SELECT * FROM orders ${clause} ORDER BY created_at DESC`, params);
   const [products]   = await db.query<any[]>("SELECT * FROM products WHERE is_active = 1");
-  const [keuangan]   = await db.query<any[]>("SELECT * FROM keuangan ORDER BY created_at DESC");
+  const [keuangan]   = await db.query<any[]>(`SELECT * FROM keuangan ${clause} ORDER BY created_at DESC`, params);
   const [modalRow]   = await db.query<any[]>("SELECT total_modal FROM finance_settings WHERE id = 1");
   const [promoCount] = await db.query<any[]>("SELECT COUNT(*) as cnt FROM promotions WHERE is_active = 1");
 
@@ -94,7 +104,9 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
 
   ws.mergeCells("A2:F2");
   const subCell = ws.getCell("A2");
-  subCell.value = `Digenerate otomatis pada: ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}  |  Data real-time dari database`;
+  subCell.value = `Digenerate otomatis pada: ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}  |  Periode: ${
+    startDate && endDate ? `${startDate} s/d ${endDate}` : "Semua Data"
+  }`;
   subCell.style = {
     font: { name: "Arial", italic: true, size: 9, color: { argb: "FF94A3B8" } },
     fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E1B4B" } },
@@ -245,12 +257,14 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
 }
 
 // ─── Sheet 2: Data Orders ─────────────────────────────────────────────────────
-async function buildOrders(wb: ExcelJS.Workbook) {
+async function buildOrders(wb: ExcelJS.Workbook, startDate?: string | null, endDate?: string | null) {
   const ws = wb.addWorksheet("📦 Data Orders");
   ws.properties.defaultRowHeight = 20;
 
+  const { clause, params } = buildDateFilter(startDate, endDate);
   const [orders] = await db.query<any[]>(
-    "SELECT * FROM orders ORDER BY created_at DESC"
+    `SELECT * FROM orders ${clause} ORDER BY created_at DESC`,
+    params
   );
 
   // Title
@@ -350,11 +364,12 @@ async function buildOrders(wb: ExcelJS.Workbook) {
 }
 
 // ─── Sheet 3: Keuangan ────────────────────────────────────────────────────────
-async function buildKeuangan(wb: ExcelJS.Workbook) {
+async function buildKeuangan(wb: ExcelJS.Workbook, startDate?: string | null, endDate?: string | null) {
   const ws = wb.addWorksheet("💰 Keuangan");
   ws.properties.defaultRowHeight = 20;
 
-  const [keuangan]   = await db.query<any[]>("SELECT * FROM keuangan ORDER BY created_at DESC");
+  const { clause, params } = buildDateFilter(startDate, endDate);
+  const [keuangan]   = await db.query<any[]>(`SELECT * FROM keuangan ${clause} ORDER BY created_at DESC`, params);
   const [modalRow]   = await db.query<any[]>("SELECT total_modal FROM finance_settings WHERE id = 1");
   const totalModal   = (modalRow as any[])[0]?.total_modal ?? 0;
 
@@ -576,25 +591,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const startDate = req.nextUrl.searchParams.get("startDate");
+    const endDate = req.nextUrl.searchParams.get("endDate");
+
     const wb = new ExcelJS.Workbook();
     wb.creator = "Markas iPhone";
     wb.created = new Date();
     wb.modified = new Date();
 
-    // Build semua sheet secara paralel untuk speed
-    await buildRingkasan(wb);
-    await buildOrders(wb);
-    await buildKeuangan(wb);
+    await buildRingkasan(wb, startDate, endDate);
+    await buildOrders(wb, startDate, endDate);
+    await buildKeuangan(wb, startDate, endDate);
     await buildProduk(wb);
 
     const buffer = await wb.xlsx.writeBuffer();
-    const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const suffix = startDate && endDate ? `${startDate}_${endDate}` : new Date().toISOString().slice(0, 10);
 
     return new NextResponse(Buffer.from(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="Laporan_MarkasiPhone_${now}.xlsx"`,
+        "Content-Disposition": `attachment; filename="Laporan_MarkasiPhone_${suffix}.xlsx"`,
         "Cache-Control": "no-store",
       },
     });
