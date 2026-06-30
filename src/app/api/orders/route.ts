@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { db } from "../../../lib/db";
+import { NextRequest, NextResponse } from "next/server";
 
 // Helper buat transporter email
 function createTransporter() {
@@ -14,21 +15,54 @@ function createTransporter() {
 }
 
 // GET semua orders
-export async function GET() {
-  try {
-    const [rows] = await db.query(`
-      SELECT *
-      FROM orders
-      ORDER BY created_at DESC
-    `);
-
-    return Response.json(rows);
-  } catch (error) {
-    return Response.json(
-      { message: "Gagal mengambil orders", error: String(error) },
-      { status: 500 }
-    );
+// GET handler — tambah query params page & limit
+export async function GET(req: NextRequest) {
+  const isAdmin = req.headers.get("x-admin-request") === "true";
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(req.url);
+  const page  = Math.max(1, parseInt(searchParams.get("page")  || "1"));
+  const limit = Math.min(1000, parseInt(searchParams.get("limit") || "20"));
+  const status = searchParams.get("status") || "";
+  const search = searchParams.get("search") || "";
+  const offset = (page - 1) * limit;
+
+  // Build WHERE
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+  if (search) {
+    conditions.push("(customer_name LIKE ? OR customer_email LIKE ? OR phone LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const [[{ total }]] = await db.query<any[]>(
+    `SELECT COUNT(*) AS total FROM orders ${where}`,
+    params
+  );
+
+  const [rows] = await db.query<any[]>(
+    `SELECT * FROM orders ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  );
+
+  return NextResponse.json({
+    data: rows,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
 }
 
 // POST buat order baru
@@ -93,7 +127,9 @@ export async function POST(request: Request) {
               <p><b>Status:</b> Menunggu Pembayaran</p>
               <hr style="border: none; border-top: 1px solid #ddd; margin: 16px 0;"/>
               <p><b>Metode Pembayaran:</b> Transfer Bank BCA</p>
-              <p><b>No. Rekening:</b> 1234567890 a.n. Markas iPhone</p>
+              <p><b>No. Rekening:</b> 7741165256 a.n. M. Iqbal Ihza</p>
+              <p><b>Metode Pembayaran:</b> Transfer SeaBank</p>
+              <p><b>No. Rekening:</b> 901213587387 a.n. Muhammad Iqbal</p>
             </div>
             <p>Kirim bukti transfer ke admin via WhatsApp setelah transfer.</p>
             <p>Salam,<br/><b>Markas iPhone</b></p>
@@ -124,6 +160,11 @@ export async function POST(request: Request) {
 
 // PATCH update status order
 export async function PATCH(request: Request) {
+  const req = request as NextRequest;
+  if (req.headers.get("x-admin-request") !== "true") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, status } = body;
@@ -193,6 +234,11 @@ export async function PATCH(request: Request) {
 
 // DELETE hapus order
 export async function DELETE(request: Request) {
+  const req = request as NextRequest;
+  if (req.headers.get("x-admin-request") !== "true") {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
