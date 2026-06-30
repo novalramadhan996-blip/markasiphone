@@ -44,6 +44,10 @@ type FormState = {
 
 type Toast = { id: number; message: string; type: "success" | "error" };
 
+type PaginationMeta = { total: number; page: number; limit: number; totalPages: number };
+
+const PRODUCTS_PER_PAGE = 20;
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const EMPTY_FORM: FormState = {
@@ -139,15 +143,21 @@ export default function AdminProdukPage() {
   const [toasts, setToasts]             = useState<Toast[]>([]);
   const toastCounter                    = useRef(0);
   const formTopRef                      = useRef<HTMLDivElement>(null);
+  
+  const [page, setPage]   = useState(1);
+  const [search, setSearch] = useState("");
+  const [meta, setMeta]   = useState<PaginationMeta | null>(null);
 
   // ── Auth check ──
   useEffect(() => {
     if (localStorage.getItem("markas_admin_logged_in") !== "true") {
       router.push("/rahasia-admin-markas/login");
-      return;
     }
-    fetchProducts();
   }, [router]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [page, search]);
 
   // ── Auto-dismiss toasts ──
   useEffect(() => {
@@ -177,17 +187,29 @@ export default function AdminProdukPage() {
 
   // ── Fetch ──
   async function fetchProducts() {
-    try {
-      setLoadingProducts(true);
-      const res  = await fetch("/api/products");
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : (data.products ?? []));
-    } catch {
-      addToast("Gagal memuat produk", "error");
-    } finally {
-      setLoadingProducts(false);
-    }
+  try {
+    setLoadingProducts(true);
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(PRODUCTS_PER_PAGE),
+    });
+    if (search.trim()) params.set("search", search.trim());
+
+    const res  = await fetch(`/api/products?${params.toString()}`);
+    const data = await res.json();
+    setProducts(Array.isArray(data) ? data : (data.products ?? []));
+    setMeta(data.meta ?? null);
+  } catch {
+    addToast("Gagal memuat produk", "error");
+  } finally {
+    setLoadingProducts(false);
   }
+}
+
+function handleSearchChange(value: string) {
+  setSearch(value);
+  setPage(1); // reset ke halaman 1 setiap kali search berubah
+}
 
   // ── Upload image ──
   async function handleUpload(file: File) {
@@ -282,7 +304,12 @@ export default function AdminProdukPage() {
       addToast("Produk berhasil dihapus", "success");
       if (editId === deleteTarget.id) resetForm();
       setDeleteTarget(null);
-      fetchProducts();
+
+      if (products.length === 1 && page > 1) {
+        setPage((p) => p - 1); // efek di atas otomatis fetch ulang
+      } else {
+        fetchProducts();
+      }
     } catch (err: any) {
       addToast(err.message ?? "Gagal hapus produk", "error");
     } finally {
@@ -479,19 +506,43 @@ export default function AdminProdukPage() {
 
           {/* ── Product Grid ── */}
           <div>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-3xl font-black tracking-tight">Daftar Produk</h2>
                 <p className="text-sm text-white/40">
-                  {loadingProducts ? "Memuat…" : `${products.length} produk di database`}
+                  {loadingProducts ? "Memuat…" : `${meta?.total ?? products.length} produk di database`}
                 </p>
               </div>
+              <input
+                type="text"
+                placeholder="Cari nama atau kategori..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="w-full max-w-xs rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-white placeholder:text-white/25 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25"
+              />
             </div>
 
-            {/* Loading */}
-            {loadingProducts && (
-              <div className="flex items-center justify-center py-16 text-white/30">
-                <Loader2 size={32} className="animate-spin" />
+            {!loadingProducts && meta && meta.totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-between gap-4">
+                <p className="text-xs text-white/30">
+                  Halaman {meta.page} dari {meta.totalPages} · {meta.total} produk
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/70 backdrop-blur-xl transition hover:bg-white/20 disabled:opacity-30"
+                  >
+                    ← Sebelumnya
+                  </button>
+                  <button
+                    disabled={page >= meta.totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/70 backdrop-blur-xl transition hover:bg-white/20 disabled:opacity-30"
+                  >
+                    Selanjutnya →
+                  </button>
+                </div>
               </div>
             )}
 

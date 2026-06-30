@@ -1,3 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "../../../lib/db";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,9 +52,16 @@ function enrichWithPromo(row: ProductRow) {
 }
 
 // GET semua produk, di-enrich dengan promo aktif & masih berlaku (belum expired)
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const [rows] = await db.query(`
+    const { searchParams } = new URL(request.url);
+    const page = searchParams.get("page");
+    const search = searchParams.get("search")?.trim() || "";
+
+    const searchClause = search ? "WHERE p.name LIKE ? OR p.category LIKE ?" : "";
+    const searchValues = search ? [`%${search}%`, `%${search}%`] : [];
+
+    const baseSelect = `
       SELECT
         p.*,
         promo.id AS promo_id,
@@ -64,11 +72,44 @@ export async function GET() {
         ON promo.product_id = p.id
         AND promo.is_active = 1
         AND (promo.valid_until IS NULL OR promo.valid_until > NOW())
+      ${searchClause}
       ORDER BY p.created_at DESC
-    `);
+    `;
 
+    // Mode lama: tanpa ?page → return semua produk (storefront tidak terdampak)
+    if (!page) {
+      const [rows] = await db.query(baseSelect, searchValues);
+      const enriched = (rows as ProductRow[]).map(enrichWithPromo);
+      return Response.json({ products: enriched });
+    }
+
+    // Mode baru: dengan ?page → paginated untuk admin produk page
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limit = Math.min(100, parseInt(searchParams.get("limit") || "20"));
+    const offset = (pageNum - 1) * limit;
+
+    const [countRows] = await db.query(
+      `SELECT COUNT(*) AS total FROM products p ${searchClause}`,
+      searchValues
+    );
+    const total = (countRows as any[])[0]?.total ?? 0;
+
+    const [rows] = await db.query(`${baseSelect} LIMIT ? OFFSET ?`, [
+      ...searchValues,
+      limit,
+      offset,
+    ]);
     const enriched = (rows as ProductRow[]).map(enrichWithPromo);
-    return Response.json({ products: enriched });
+
+    return Response.json({
+      products: enriched,
+      meta: {
+        total,
+        page: pageNum,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     return Response.json(
       { message: "Gagal mengambil produk", error: String(error) },
