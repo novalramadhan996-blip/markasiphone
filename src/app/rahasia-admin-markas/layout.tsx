@@ -25,7 +25,6 @@ const NAV_ITEMS = [
   { href: "/rahasia-admin-markas/produk",    label: "Produk",    Icon: Package,        showBadge: false },
   { href: "/rahasia-admin-markas/keuangan",  label: "Keuangan",  Icon: DollarSign,     showBadge: false },
   { href: "/rahasia-admin-markas/laporan",   label: "Laporan",   Icon: BarChart3,      showBadge: false },
-  { href: "/rahasia-admin-markas/testimoni", label: "Testimoni", Icon: Star,           showBadge: false },
   { href: "/rahasia-admin-markas/promosi",   label: "Promosi",   Icon: Tag,            showBadge: false },
   { href: "/rahasia-admin-markas/banner",    label: "Banner",    Icon: Image,          showBadge: false },
 ] as const;

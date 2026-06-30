@@ -67,7 +67,6 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
   const [keuangan]   = await db.query<any[]>("SELECT * FROM keuangan ORDER BY created_at DESC");
   const [modalRow]   = await db.query<any[]>("SELECT total_modal FROM finance_settings WHERE id = 1");
   const [promoCount] = await db.query<any[]>("SELECT COUNT(*) as cnt FROM promotions WHERE is_active = 1");
-  const [testiCount] = await db.query<any[]>("SELECT COUNT(*) as cnt FROM testimonials WHERE status = 'approved'");
 
   const totalModal     = (modalRow as any[])[0]?.total_modal ?? 0;
   const totalIncome    = (keuangan as any[]).filter((k: any) => k.type === "income").reduce((s: number, k: any) => s + Number(k.amount), 0);
@@ -80,7 +79,6 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
   const stokHabis      = (products as any[]).filter((p: any) => p.stock === 0).length;
   const laba           = totalIncome - totalExpense;
   const activePromo    = (promoCount as any[])[0]?.cnt ?? 0;
-  const approvedTesti  = (testiCount as any[])[0]?.cnt ?? 0;
   
 
   // ── Title banner ──
@@ -192,7 +190,6 @@ async function buildRingkasan(wb: ExcelJS.Workbook) {
     ["🛒 Total Produk Aktif",     totalProduk,   "number"],
     ["⚠️ Produk Stok Habis",      stokHabis,     "number"],
     ["🏷️ Promo Aktif",            activePromo,   "number"],
-    ["⭐ Testimoni Disetujui",    approvedTesti, "number"],
   ];
 
   const phRow = ws.addRow(["Indikator", "Nilai", "", "", "", ""]);

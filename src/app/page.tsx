@@ -33,18 +33,9 @@ type DbProduct = {
   created_at: string;
 };
 
-type Testimoni = {
-  id: number;
-  customer_name: string;
-  rating: number;
-  message: string;
-  photo_url: string | null;
-};
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [products, setProducts] = useState<DbProduct[]>([]);
-  const [testimonials, setTestimonials] = useState<Testimoni[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("Semua");
@@ -85,19 +76,6 @@ export default function Home() {
         console.error("Gagal ambil produk:", error);
         setProducts([]);
       });
-  }, []);
-
-  // ── Fetch testimonials ──────────────────────────────────────────────────────
-  useEffect(() => {
-    fetch("/api/testimonials?status=approved")
-      .then((res) => res.json())
-      .then((data) => {
-        const list: Testimoni[] = Array.isArray(data)
-          ? data
-          : (data.testimonials ?? []);
-        setTestimonials(list.slice(0, 3));
-      })
-      .catch(() => setTestimonials([]));
   }, []);
 
   // ── Debounce search input ───────────────────────────────────────────────────
@@ -395,80 +373,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Testimonials Preview ─────────────────────────────────────────── */}
-      <section id="testimoni" className="bg-black px-6 py-24 text-white">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-14 text-center">
-            <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-blue-400">
-              Kata Mereka
-            </p>
-            <h2 className="text-5xl font-black tracking-[-0.06em] md:text-7xl">
-              Testimoni
-              <span className="block bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent pb-3">
-                Pelanggan.
-              </span>
-            </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg text-white/50">
-              Pengalaman nyata dari pelanggan setia Markas iPhone.
-            </p>
-          </div>
-
-          {testimonials.length > 0 ? (
-            <div className="mb-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {testimonials.map((t, i) => (
-                <motion.div
-                  key={t.id}
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.55, delay: i * 0.1 }}
-                  viewport={{ once: true }}
-                  className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
-                >
-                  <div className="mb-4 flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star
-                        key={s}
-                        size={15}
-                        className={
-                          s <= t.rating
-                            ? "fill-amber-400 text-amber-400"
-                            : "fill-white/10 text-white/20"
-                        }
-                      />
-                    ))}
-                  </div>
-                  <p className="mb-5 text-sm leading-relaxed text-white/65">
-                    &ldquo;{t.message}&rdquo;
-                  </p>
-                  <p className="text-sm font-bold text-white/80">
-                    — {t.customer_name}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="mb-10 rounded-[32px] border border-white/10 bg-white/5 py-16 text-center">
-              <Star size={32} className="mx-auto mb-3 text-white/20" />
-              <p className="text-white/40">Belum ada testimoni tersedia.</p>
-            </div>
-          )}
-
-          <div className="text-center">
-            <Link
-              href="/testimoni"
-              className="group inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-8 py-4 font-black text-white backdrop-blur-xl transition-all duration-300 hover:border-blue-500/40 hover:bg-blue-500/15 hover:shadow-[0_0_40px_rgba(59,130,246,0.2)]"
-            >
-              <Star size={18} className="text-amber-400" />
-              Lihat Semua Testimoni Pelanggan
-              <ArrowRight
-                size={17}
-                className="transition-transform duration-300 group-hover:translate-x-1"
-              />
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* ── Offline Store, Contact & Socials Section ─────────────────────── */}
       <section id="kontak" className={`relative overflow-hidden px-6 py-28 transition-colors duration-500 ${isDarkMode ? "bg-[#0b0b0c] text-white" : "bg-[#f5f5f7] text-black"}`}>
         {/* Dynamic Background Glow */}
@@ -561,7 +465,7 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition ${
-                    isDarkMode ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-black/5 bg-neutral-50 hover:bg-neutral-100"
+                    isDarkMode ? "border-white/10 bg-purple/5 hover:bg-white/10" : "border-black/5 bg-purple-50 hover:bg-neutral-100"
                   }`}
                 >
                   Instagram
