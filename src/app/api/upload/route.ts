@@ -1,17 +1,24 @@
 // src/app/api/upload/route.ts
 // Semua upload dikonversi ke .webp via sharp untuk optimasi ukuran & SEO.
-// Install: npm install sharp
-// sharp adalah native addon — Turbopack sudah mendukung ini secara otomatis.
+// Storage: Vercel Blob di production, folder lokal /public/uploads saat development.
+// Install: npm install sharp @vercel/blob
 
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import sharp from "sharp";
+import { put } from "@vercel/blob";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE ?? "5242880"); // 5MB default
-const UPLOAD_DIR    = path.join(process.cwd(), "public", "uploads");
-const WEBP_QUALITY  = 82; // 0-100; 82 = good balance quality vs size
+const UPLOAD_DIR     = path.join(process.cwd(), "public", "uploads");
+const WEBP_QUALITY   = 82; // 0-100; 82 = good balance quality vs size
+
+// Vercel Blob aktif kalau token tersedia (otomatis di-inject Vercel setelah
+// Storage > Blob di-connect ke project). Di lokal tanpa token → fallback ke disk.
+const USE_BLOB_STORAGE = !!process.env.BLOB_READ_WRITE_TOKEN;
+
+export const runtime = "nodejs"; // sharp & fs butuh Node runtime, bukan Edge
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +45,25 @@ async function toWebp(buffer: Buffer): Promise<Buffer> {
     .rotate()           // auto-rotate from EXIF (important for mobile photos)
     .webp({ quality: WEBP_QUALITY, effort: 4 })
     .toBuffer();
+}
+
+/**
+ * Simpan file webp ke storage yang aktif.
+ * Production (Vercel): Vercel Blob — persistent, public URL langsung.
+ * Development (lokal): folder /public/uploads — seperti behavior sebelumnya.
+ */
+async function saveWebp(buffer: Buffer, filename: string): Promise<string> {
+  if (USE_BLOB_STORAGE) {
+    const blob = await put(`uploads/${filename}`, buffer, {
+      access: "public",
+      contentType: "image/webp",
+    });
+    return blob.url;
+  }
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  await writeFile(path.join(UPLOAD_DIR, filename), buffer);
+  return `/uploads/${filename}`;
 }
 
 // ─── POST /api/upload ─────────────────────────────────────────────────────────
@@ -93,8 +119,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Read buffer ──
-    const arrayBuffer  = await file.arrayBuffer();
-    const inputBuffer  = Buffer.from(arrayBuffer);
+    const arrayBuffer = await file.arrayBuffer();
+    const inputBuffer = Buffer.from(arrayBuffer);
 
     // ── Convert to WebP ──
     let webpBuffer: Buffer;
@@ -108,13 +134,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Save file ──
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const filename    = buildFilename(file.name);
-    const outputPath  = path.join(UPLOAD_DIR, filename);
-    await writeFile(outputPath, webpBuffer);
-
-    const imageUrl = `/uploads/${filename}`;
+    // ── Save file (Blob di production, disk di lokal) ──
+    const filename = buildFilename(file.name);
+    let imageUrl: string;
+    try {
+      imageUrl = await saveWebp(webpBuffer, filename);
+    } catch (storageErr) {
+      console.error("[upload] storage write failed:", storageErr);
+      return NextResponse.json(
+        { error: "Gagal menyimpan file ke storage." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
@@ -126,6 +157,7 @@ export async function POST(req: NextRequest) {
         originalSize: file.size,
         convertedSize: webpBuffer.length,
         format: "webp",
+        storage: USE_BLOB_STORAGE ? "vercel-blob" : "local-disk",
       },
       { status: 201 }
     );
@@ -146,5 +178,6 @@ export async function GET() {
     accepts: "multipart/form-data (field: file)",
     converts: "all images → .webp",
     maxSize: `${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB`,
+    storage: USE_BLOB_STORAGE ? "vercel-blob" : "local-disk",
   });
 }
