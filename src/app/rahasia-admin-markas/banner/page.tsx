@@ -385,14 +385,28 @@ function BannerRow({
   onEdit,
   onDelete,
   onToggle,
+  onDragStart,
+  onDrop,
+  isDragging,
 }: {
   banner: Banner;
   onEdit: (b: Banner) => void;
   onDelete: (b: Banner) => void;
   onToggle: (b: Banner) => void;
+  onDragStart: () => void;
+  onDrop: () => void;
+  isDragging: boolean;
 }) {
   return (
-    <div className="flex items-center gap-4 bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 rounded-[20px] p-4 transition-colors group">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={onDrop}
+      className={`flex items-center gap-4 bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 rounded-[20px] p-4 transition-colors group cursor-move ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
       {/* Drag Handle (visual only) */}
       <GripVertical className="w-4 h-4 text-white/20 shrink-0" />
 
@@ -491,6 +505,7 @@ export default function BannerPage() {
     | { type: "delete"; banner: Banner }
     | null
   >(null);
+  const [draggedBanner, setDraggedBanner] = useState<Banner | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -541,6 +556,52 @@ export default function BannerPage() {
     } catch {
       toast("Gagal mengubah status", "error");
     }
+  }
+
+  async function persistReorder(orderedList: Banner[]) {
+    const payload = orderedList.map((b, idx) => ({ id: b.id, sort_order: idx }));
+    try {
+      const res = await fetch("/api/banners", {
+        method: "PATCH",
+        headers: ADMIN_HEADERS,
+        body: JSON.stringify({ reorder: payload }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      toast("Gagal menyimpan urutan, memuat ulang...", "error");
+      loadBanners(); // revert ke state server kalau gagal
+    }
+  }
+
+  function handleDrop(targetBanner: Banner, section: "active" | "inactive") {
+    if (!draggedBanner || draggedBanner.id === targetBanner.id) {
+      setDraggedBanner(null);
+      return;
+    }
+
+    const sectionList = section === "active" ? activeBanners : inactiveBanners;
+    const draggedIndex = sectionList.findIndex((b) => b.id === draggedBanner.id);
+    const targetIndex = sectionList.findIndex((b) => b.id === targetBanner.id);
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedBanner(null);
+      return;
+    }
+
+    const reordered = [...sectionList];
+    const [moved] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const reorderedWithSortOrder = reordered.map((b, idx) => ({ ...b, sort_order: idx }));
+
+    // Optimistic update — ganti hanya banner di section yang berubah
+    setBanners((prev) => {
+      const otherSection = prev.filter((b) =>
+        section === "active" ? b.is_active !== 1 : b.is_active !== 0
+      );
+      return [...otherSection, ...reorderedWithSortOrder];
+    });
+
+    persistReorder(reordered);
+    setDraggedBanner(null);
   }
 
   const activeBanners = banners.filter((b) => b.is_active === 1);
@@ -599,6 +660,7 @@ export default function BannerPage() {
             <p className="text-indigo-400/60 text-xs mt-0.5">
               Urutkan berdasarkan angka sort order (terkecil tampil duluan). Banner harus
               diset <span className="font-bold">Aktif</span> agar muncul di homepage.
+              Geser kartu (drag) untuk mengubah urutan secara langsung.
             </p>
           </div>
         </div>
@@ -637,6 +699,9 @@ export default function BannerPage() {
                       onEdit={(b) => setModalState({ type: "edit", banner: b })}
                       onDelete={(b) => setModalState({ type: "delete", banner: b })}
                       onToggle={handleToggle}
+                      onDragStart={() => setDraggedBanner(b)}
+                      onDrop={() => handleDrop(b, "active")}
+                      isDragging={draggedBanner?.id === b.id}
                     />
                   ))}
                 </div>
@@ -657,6 +722,9 @@ export default function BannerPage() {
                       onEdit={(b) => setModalState({ type: "edit", banner: b })}
                       onDelete={(b) => setModalState({ type: "delete", banner: b })}
                       onToggle={handleToggle}
+                      onDragStart={() => setDraggedBanner(b)}
+                      onDrop={() => handleDrop(b, "inactive")}
+                      isDragging={draggedBanner?.id === b.id}
                     />
                   ))}
                 </div>

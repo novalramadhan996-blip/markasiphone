@@ -74,6 +74,23 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    if (Array.isArray(body.reorder)) {
+      if (body.reorder.length === 0) {
+        return NextResponse.json({ error: "reorder array kosong" }, { status: 400 });
+      }
+
+      for (const item of body.reorder) {
+        if (!item?.id || item.sort_order === undefined) continue;
+        await db.query("UPDATE banners SET sort_order = ? WHERE id = ?", [
+          Number(item.sort_order),
+          Number(item.id),
+        ]);
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     const { id, title, subtitle, image_url, link_url, sort_order, is_active } = body;
 
     if (!id) {
