@@ -326,7 +326,17 @@ Saya akan mengirim bukti transfer di chat ini.`);
                 {rekening}
               </h3>
 
-              <p className="text-neutral-500">Atas Nama: Markas iPhone</p>
+              <p className="text-neutral-500">Atas Nama: M. Iqbal Ihza</p>
+
+              <p className="mb-2 text-sm font-bold text-neutral-400">
+                SeaBank
+              </p>
+
+              <h3 className="mb-4 text-5xl font-black tracking-[-0.05em]">
+                {rekening}
+              </h3>
+
+              <p className="text-neutral-500">Atas Nama: Muhammad Iqbal</p>
 
               <button
                 type="button"

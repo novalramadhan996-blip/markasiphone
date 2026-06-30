@@ -309,6 +309,7 @@ function InvoicePrint({ order }: { order: Order }) {
             </span>
           </p>
           <p style={{ color: "#555" }}>Pembayaran: Transfer BCA</p>
+          <p style={{ color: "#555" }}>Pembayaran: SeaBank</p>
         </div>
       </div>
 

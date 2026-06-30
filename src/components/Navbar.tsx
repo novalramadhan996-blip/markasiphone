@@ -2,18 +2,26 @@
 
 import { Search, ShoppingBag, UserRound, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCartStore } from "../store/CartStore";
 import { useProductStore } from "../store/ProductStore";
 
 export default function Navbar() {
   const [openSearch, setOpenSearch] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
 
   const { products } = useProductStore();
   const { cart } = useCartStore();
 
   const cartCount = cart.reduce((total, item) => total + item.qty, 0);
+
+  useEffect(() => {
+    if (openSearch) {
+      const currentTheme = localStorage.getItem("theme");
+      setIsDarkTheme(currentTheme !== "light");
+    }
+  }, [openSearch]);
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(keyword.toLowerCase())
@@ -21,7 +29,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 z-50 w-full border-b border-white/10 bg-black/45 backdrop-blur-2xl">
+      <header className="fixed top-0 z-40 w-full border-b border-black/5 bg-white/45 dark:border-white/10 dark:bg-black/45 backdrop-blur-2xl transition-colors duration-500">
         <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-3">
             <img
@@ -40,7 +48,7 @@ export default function Navbar() {
             </div>
           </Link>
 
-          <div className="hidden items-center rounded-full border border-white/10 bg-white/10 px-2 py-2 text-[13px] font-bold text-white/70 backdrop-blur-xl md:flex">
+          <div className="hidden items-center rounded-full border border-black/5 bg-neutral-100/80 px-2 py-2 text-[13px] font-bold text-neutral-600 dark:border-white/10 dark:bg-white/10 dark:text-white/70 backdrop-blur-xl md:flex">
             <Link className="rounded-full px-5 py-2 hover:bg-white/10 hover:text-white" href="/#produk">
               iPhone
             </Link>
@@ -55,7 +63,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-3 text-white">
+          <div className="flex items-center gap-3 text-neutral-800 dark:text-white">
             <button
               type="button"
               onClick={() => setOpenSearch(true)}
@@ -78,20 +86,20 @@ export default function Navbar() {
             </Link>
 
             <Link
-  href="/rahasia-admin-markas/login"
-  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-white/25 to-white/5 shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-white/20"
->
-  <UserRound size={18} />
-</Link>
+              href="/rahasia-admin-markas/login"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-white/25 to-white/5 shadow-lg backdrop-blur-xl transition hover:scale-105 hover:bg-white/20"
+            >
+              <UserRound size={18} />
+            </Link>
           </div>
         </nav>
       </header>
 
       {openSearch && (
-        <div className="fixed inset-0 z-[999] bg-black/80 px-6 py-10 backdrop-blur-2xl">
+        <div className={`fixed inset-0 z-[999] px-6 py-10 backdrop-blur-2xl transition-colors duration-300 ${isDarkTheme ? "bg-black/80" : "bg-[#f5f5f7]/95"}`}>
           <div className="mx-auto max-w-3xl">
             <div className="mb-8 flex items-center justify-between">
-              <h2 className="text-4xl font-black tracking-[-0.05em] text-white">
+              <h2 className={`text-4xl font-black tracking-[-0.05em] ${isDarkTheme ? "text-white" : "text-neutral-900"}`}>
                 Cari Produk
               </h2>
 

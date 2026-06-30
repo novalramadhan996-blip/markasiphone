@@ -127,7 +127,9 @@ export async function POST(request: Request) {
               <p><b>Status:</b> Menunggu Pembayaran</p>
               <hr style="border: none; border-top: 1px solid #ddd; margin: 16px 0;"/>
               <p><b>Metode Pembayaran:</b> Transfer Bank BCA</p>
-              <p><b>No. Rekening:</b> 1234567890 a.n. Markas iPhone</p>
+              <p><b>No. Rekening:</b> 7741165256 a.n. M. Iqbal Ihza</p>
+              <p><b>Metode Pembayaran:</b> Transfer SeaBank</p>
+              <p><b>No. Rekening:</b> 901213587387 a.n. Muhammad Iqbal</p>
             </div>
             <p>Kirim bukti transfer ke admin via WhatsApp setelah transfer.</p>
             <p>Salam,<br/><b>Markas iPhone</b></p>

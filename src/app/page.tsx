@@ -157,9 +157,14 @@ export default function Home() {
       </button>
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen overflow-hidden bg-black">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,#2563eb55_0%,transparent_32%),radial-gradient(circle_at_80%_10%,#9333ea55_0%,transparent_28%),radial-gradient(circle_at_50%_90%,#06b6d455_0%,transparent_32%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,black_85%)]" />
+      <section className={`relative min-h-screen overflow-hidden transition-colors duration-500 ${isDarkMode ? "bg-black" : "bg-white"}`}>
+        {/* Dynamic Glow Effect */}
+        <div className={`absolute inset-0 transition-opacity duration-500 ${isDarkMode ? "opacity-100" : "opacity-30"}`} 
+          style={{
+            backgroundImage: "radial-gradient(circle_at_20%_20%,#2563eb55_0%,transparent_32%), radial-gradient(circle_at_80%_10%,#9333ea55_0%,transparent_28%), radial-gradient(circle_at_50%_90%,#06b6d455_0%,transparent_32%)"
+          }} 
+        />
+        <div className={`absolute inset-0 transition-colors duration-500 ${isDarkMode ? "bg-[linear-gradient(to_bottom,transparent,black_85%)]" : "bg-[linear-gradient(to_bottom,transparent,#f5f5f7_85%)]"}`} />
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -168,19 +173,23 @@ export default function Home() {
           className="relative z-10 mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-6 py-28 lg:grid-cols-2"
         >
           <div className="text-center lg:text-left">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-bold text-white/80 backdrop-blur-xl">
-              <Sparkles size={16} />
+            <div className={`mb-6 inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl ${
+              isDarkMode ? "border-white/15 bg-white/10 text-white/80" : "border-black/10 bg-neutral-100 text-neutral-800"
+            }`}>
+              <Sparkles size={16} className={isDarkMode ? "text-white" : "text-blue-600"} />
               Premium Apple Store Experience
             </div>
 
             <h1 className="mb-6 text-7xl font-black leading-none tracking-[-0.08em] md:text-9xl">
               iPhone
-              <span className="block bg-gradient-to-r from-blue-300 via-white to-purple-300 bg-clip-text text-transparent">
+              <span className={`block bg-gradient-to-r bg-clip-text text-transparent ${
+                isDarkMode ? "from-blue-300 via-white to-purple-300" : "from-blue-600 via-neutral-900 to-indigo-600"
+              }`}>
                 15 Pro.
               </span>
             </h1>
 
-            <p className="mx-auto mb-9 max-w-xl text-xl leading-9 text-white/60 lg:mx-0">
+            <p className={`mx-auto mb-9 max-w-xl text-xl leading-9 lg:mx-0 ${isDarkMode ? "text-white/60" : "text-neutral-500"}`}>
               Website toko Apple dengan UI cinematic, glossy, modern, dan katalog
               produk premium.
             </p>
@@ -188,7 +197,11 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-4 lg:justify-start">
               <Link
                 href="#produk"
-                className="group inline-flex items-center gap-3 rounded-full bg-white px-8 py-5 font-black text-black transition-all duration-300 hover:scale-105 hover:shadow-[0_20px_60px_rgba(255,255,255,0.25)]"
+                className={`group inline-flex items-center gap-3 rounded-full px-8 py-5 font-black transition-all duration-300 hover:scale-105 ${
+                  isDarkMode 
+                    ? "bg-white text-black hover:shadow-[0_20px_60px_rgba(255,255,255,0.25)]" 
+                    : "bg-black text-white hover:shadow-[0_20px_60px_rgba(0,0,0,0.15)]"
+                }`}
               >
                 Explore Produk
                 <ArrowRight
@@ -199,7 +212,11 @@ export default function Home() {
 
               <Link
                 href="#produk"
-                className="rounded-full border border-white/10 bg-white/10 px-8 py-5 font-black text-white backdrop-blur-xl transition-all duration-300 hover:border-white/20 hover:bg-white/20"
+                className={`rounded-full border px-8 py-5 font-black backdrop-blur-xl transition-all duration-300 ${
+                  isDarkMode 
+                    ? "border-white/10 bg-white/10 text-white hover:border-white/20 hover:bg-white/20" 
+                    : "border-black/5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+                }`}
               >
                 Lihat Koleksi
               </Link>
@@ -225,21 +242,23 @@ export default function Home() {
 
       {/* ── Feature Badges ───────────────────────────────────────────────── */}
       <section className="relative z-10 -mt-24 px-6 pb-20">
-        <div className="mx-auto grid max-w-7xl gap-5 rounded-[40px] border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur-2xl md:grid-cols-3">
-          <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
-            <Truck className="mb-5 text-blue-300" size={30} />
+        <div className={`mx-auto grid max-w-7xl gap-5 rounded-[40px] border p-5 shadow-2xl backdrop-blur-2xl md:grid-cols-3 ${
+          isDarkMode ? "border-white/10 bg-white/10" : "border-black/5 bg-white/80"
+        }`}>
+          <div className={`rounded-[32px] p-7 backdrop-blur-xl ${isDarkMode ? "bg-white/10" : "bg-neutral-50"}`}>
+            <Truck className="mb-5 text-blue-500 dark:text-blue-300" size={30} />
             <h3 className="mb-2 text-2xl font-black">Gratis Ongkir</h3>
-            <p className="text-white/55">Untuk area tertentu.</p>
+            <p className={isDarkMode ? "text-white/55" : "text-neutral-500"}>Untuk area tertentu.</p>
           </div>
-          <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
-            <ShieldCheck className="mb-5 text-blue-300" size={30} />
+          <div className={`rounded-[32px] p-7 backdrop-blur-xl ${isDarkMode ? "bg-white/10" : "bg-neutral-50"}`}>
+            <ShieldCheck className="mb-5 text-blue-500 dark:text-blue-300" size={30} />
             <h3 className="mb-2 text-2xl font-black">Garansi Resmi</h3>
-            <p className="text-white/55">Produk original dan bergaransi.</p>
+            <p className={isDarkMode ? "text-white/55" : "text-neutral-500"}>Produk original dan bergaransi.</p>
           </div>
-          <div className="rounded-[32px] bg-white/10 p-7 backdrop-blur-xl">
-            <CreditCard className="mb-5 text-blue-300" size={30} />
+          <div className={`rounded-[32px] p-7 backdrop-blur-xl ${isDarkMode ? "bg-white/10" : "bg-neutral-50"}`}>
+            <CreditCard className="mb-5 text-blue-500 dark:text-blue-300" size={30} />
             <h3 className="mb-2 text-2xl font-black">Cicilan Mudah</h3>
-            <p className="text-white/55">Pembayaran fleksibel.</p>
+            <p className={isDarkMode ? "text-white/55" : "text-neutral-500"}>Pembayaran fleksibel.</p>
           </div>
         </div>
       </section>
@@ -256,7 +275,7 @@ export default function Home() {
               Pilihan Premium.
             </h2>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-neutral-500">
-              Pilih produk Apple favorit kamu dari database Markas iPhone.
+              Pilih produk Apple favorit kamu dari katalog Markas iPhone.
             </p>
           </div>
 
@@ -385,7 +404,7 @@ export default function Home() {
             </p>
             <h2 className="text-5xl font-black tracking-[-0.06em] md:text-7xl">
               Testimoni
-              <span className="block bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-blue-300 to-purple-300 bg-clip-text text-transparent pb-3">
                 Pelanggan.
               </span>
             </h2>
@@ -475,18 +494,17 @@ export default function Home() {
                 📍 Markas iPhone Official Store
               </p>
               <p className={isDarkMode ? "text-white/55" : "text-neutral-500"}>
-                Jl. Utama No. 123, Lantai 2, Kota Jakarta Selatan, DKI Jakarta, 12345. <br />
-                (Samping Mall Premium Apple, Seberang Stasiun Kota).
+                Jl. Parigi Lama, Kotakulon, Kec. Sumedang Sel., Kabupaten Sumedang, Jawa Barat 45311
               </p>
               <p className="text-sm font-bold text-blue-500">
-                Jam Operasional: Setiap Hari (10.00 - 22.00 WIB)
+                Jam Operasional: Setiap Hari 24 Jam
               </p>
             </div>
 
             {/* Tombol Google Maps */}
             <div className="mt-8">
               <a
-                href="https://maps.google.com"
+                href="https://www.google.com/maps/place/Markasiphone/@-6.8401311,107.9125508,216m/data=!3m2!1e3!4b1!4m6!3m5!1s0x2e68d10001bb0a9f:0xb1d93d62199c6620!8m2!3d-6.8401311!4d107.9125508!16s%2Fg%2F11n55sjs8h!5m1!1e1?hl=en&entry=ttu&g_ep=EgoyMDI2MDYyNC4wIKXMDSoASAFQAw%3D%3D"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`inline-flex items-center gap-3 rounded-full border px-7 py-3.5 font-black text-sm backdrop-blur-xl transition-all duration-300 ${
@@ -539,7 +557,7 @@ export default function Home() {
 
               <div className="grid grid-cols-2 gap-3">
                 <a
-                  href="https://instagram.com"
+                  href="https://instagram.com/markasiphone"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition ${
@@ -549,7 +567,7 @@ export default function Home() {
                   Instagram
                 </a>
                 <a
-                  href="https://tiktok.com"
+                  href="https://www.tiktok.com/@markasiphone?_r=1&_t=ZS-97c2gbiFjXx"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-bold transition ${
